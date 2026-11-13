@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+coverage/
+
+# Generated Quran data (rebuild via `npm run data:fetch && npm run data:build`)
+src/data/generated/
+public/fonts/
+
+# Downloaded source cache
+.cache/
+
+# Tooling
+*.local
+.vite/
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# Env
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
