@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+/*
+ * The `dark:` Tailwind variant maps to the Night theme, which is driven by a
+ * `data-theme` attribute set in index.html before first paint.
+ */
+@custom-variant dark (&:where([data-theme="night"], [data-theme="night"] *));
+
+/*
+ * Design tokens are plain CSS custom properties switched by `data-theme`, then
+ * exposed to Tailwind utilities. Components use `bg-bg`, `text-ink`, etc. and
+ * follow the active theme automatically.
+ */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-selection: var(--selection);
+  --color-hairline: var(--hairline);
+  --color-page: var(--page);
+
+  --font-sans:
+    "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-quran: "UthmanicHafs", "Amiri", "Traditional Arabic", "Scheherazade New", serif;
+
+  --radius-page: 12px;
+}
+
+/* ---- Parchment (default): ivory paper + near-black ink, Madani green accent ---- */
+:root,
+[data-theme="parchment"] {
+  --bg: #faf7f0;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --ink: #1e1b16;
+  --ink-muted: #6f675c;
+  --accent: #0f6b4f;
+  --accent-soft: color-mix(in srgb, #0f6b4f 10%, transparent);
+  --selection: rgba(201, 162, 39, 0.22);
+  --hairline: rgba(30, 27, 22, 0.08);
+  --page: #fffdf7;
+  color-scheme: light;
+}
+
+/* ---- Sepia: warm sand study tones ---- */
+[data-theme="sepia"] {
+  --bg: #f3e9d8;
+  --surface: #fbf4e6;
+  --surface-raised: #fdf9f0;
+  --ink: #2b2118;
+  --ink-muted: #7a6a55;
+  --accent: #0f6b4f;
+  --accent-soft: color-mix(in srgb, #0f6b4f 12%, transparent);
+  --selection: rgba(201, 162, 39, 0.25);
+  --hairline: rgba(43, 33, 24, 0.1);
+  --page: #fdf8ec;
+  color-scheme: light;
+}
+
+/* ---- Night: warm dark charcoal, never pure black ---- */
+[data-theme="night"] {
+  --bg: #1b1917;
+  --surface: #262320;
+  --surface-raised: #2d2926;
+  --ink: #eae4da;
+  --ink-muted: #a39b8f;
+  --accent: #c9a227;
+  --accent-soft: color-mix(in srgb, #c9a227 12%, transparent);
+  --selection: rgba(201, 162, 39, 0.2);
+  --hairline: rgba(234, 228, 218, 0.1);
+  --page: #211e1b;
+  color-scheme: dark;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+/* Respect reduced-motion preferences across the app. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

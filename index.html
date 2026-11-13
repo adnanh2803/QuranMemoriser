@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-theme="parchment">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Offline Madani Mushaf reader with verse selection" />
+    <meta name="theme-color" content="#faf7f0" />
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>QuranMemoriser</title>
+    <script>
+      // Apply the saved theme before first paint to avoid a flash of the wrong colors.
+      try {
+        const theme = localStorage.getItem("qm.theme");
+        if (theme === "sepia" || theme === "night") {
+          document.documentElement.dataset.theme = theme;
+        }
+      } catch {
+        // localStorage unavailable (e.g. privacy mode) — keep the default theme.
+      }
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="QuranMemoriser">
+  <rect width="512" height="512" rx="96" fill="#0f6b4f"/>
+  <!-- Open mushaf: two parchment leaves -->
+  <path d="M96 128c48-16 96-16 152 8 56-24 104-24 152-8v248c-48-16-96-16-152 8-56-24-104-24-152-8z" fill="#fffdf7"/>
+  <path d="M256 136v248" stroke="#0f6b4f" stroke-width="6" stroke-linecap="round" opacity="0.25"/>
+  <!-- Text lines -->
+  <g stroke="#1e1b16" stroke-width="10" stroke-linecap="round" opacity="0.85">
+    <path d="M124 176h100"/>
+    <path d="M288 176h100"/>
+    <path d="M124 224h100"/>
+    <path d="M288 224h100"/>
+    <path d="M124 272h72"/>
+    <path d="M316 272h72"/>
+  </g>
+  <!-- Ayah marker -->
+  <circle cx="256" cy="360" r="26" fill="#c9a227"/>
+  <path d="M238 360a18 18 0 0 1 18-18v36a18 18 0 0 1-18-18zm36 0a18 18 0 0 0-18-18v36a18 18 0 0 0 18-18z" fill="#0f6b4f"/>
+</svg>
