@@ -1,0 +1,237 @@
+/*
+ * Mushaf sheets: the Madinah print rendered with KFGQPC QCF v1 page fonts.
+ *
+ * The sheet is a picture of a paper page, not a document: its glyphs are
+ * private-use codepoints, so nothing on it is selectable — selection is
+ * whole-ayah, driven by taps and mirrored by the selection banner.
+ *
+ * Sizing follows the layout's own scale (public/data/meta.json): the sheet is
+ * set so the widest printed line (fit.body = 19.76 ems in v1) just fills it,
+ * at one type size for the whole mushaf. The line grid is 15 × 1.92 em.
+ */
+
+.sheet-anchor {
+  container-type: inline-size;
+}
+
+.sheet {
+  --m-base: var(--m-fit-body, 19.76);
+  --m-line-ratio: 1.92;
+  --m-grid: 15;
+  --m-line-h: calc(var(--m-line-ratio) * 1em);
+  --sheet-pad-x: clamp(14px, calc(14px + (100vw - 640px) * 0.025), 30px);
+  --sheet-pad-t: 12px;
+  --sheet-pad-b: 10px;
+  /* Everything above the type that the height bound must leave room for:
+     top bar, sheet margin and the running head with its gap. */
+  --chrome-f: 118px;
+
+  /* The type size: the smallest of the zoom asked for, the width the sheet
+     actually got, and one whole page in the height (floored so a page that
+     scrolls beats one that cannot be read). */
+  --m-size: min(
+    calc(var(--page-measure, 640px) / var(--m-base)),
+    calc((100cqw - var(--sheet-pad-x) * 2 - 28px) / var(--m-base)),
+    max(calc((100svh - var(--chrome-f)) / (var(--m-grid) * var(--m-line-ratio))), 13px)
+  );
+
+  position: relative;
+  width: calc(var(--m-size) * var(--m-base) + var(--sheet-pad-x) * 2);
+  max-width: 100%;
+  margin-inline: auto;
+  padding: var(--sheet-pad-t) var(--sheet-pad-x) var(--sheet-pad-b);
+  background: var(--page);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.06),
+    0 10px 28px rgb(0 0 0 / 0.07);
+  scroll-margin-top: 12px;
+}
+
+@media (max-width: 767px) {
+  .sheet {
+    --chrome-f: 184px;
+  }
+}
+
+/* --- running head: juz, surah, folio ------------------------------------ */
+
+.sheet-head {
+  direction: rtl;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-family: var(--font-sans);
+  color: var(--ink);
+}
+
+.ph-label {
+  flex: 0 0 auto;
+  font-size: clamp(0.72rem, calc(100cqw * 0.018), 0.85rem);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--accent);
+}
+
+.ph-juz {
+  justify-self: start;
+}
+
+.ph-page {
+  justify-self: end;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The ornamental surah name, centred. Inline-flex with direction rtl puts the
+   word and the name in reading order: these glyphs are private-use codepoints
+   with bidi class L, so in a plain rtl element the pair reads backwards. */
+.ph-surah {
+  display: inline-flex;
+  direction: rtl;
+  align-items: baseline;
+  font-family: "SuraNames", serif;
+  font-weight: 400;
+  font-size: clamp(0.95rem, calc(100cqw * 0.03), 1.3rem);
+  line-height: 1.1;
+  color: var(--accent);
+}
+
+.ph-surah .sn {
+  margin-inline-start: 0.1em;
+}
+
+/* --- the mushaf box ------------------------------------------------------ */
+
+.mushaf {
+  direction: rtl;
+  font-size: var(--m-size);
+  color: var(--ink);
+  line-height: var(--m-line-h);
+
+  /* A picture of a page: glyph codes copy as nothing, and a dragged
+     selection would only confuse — whole-ayah selection is ours to draw. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.m-line {
+  display: flex;
+  align-items: baseline;
+  /* Flush both margins: the leftover space goes between the words, which is
+     how a v1 mushaf justifies its lines. */
+  justify-content: space-between;
+  height: var(--m-line-h);
+  line-height: var(--m-line-h);
+  white-space: nowrap;
+}
+
+/* A line that stops short of the margin is centred rather than pulled apart —
+   the odd short line elsewhere, and a surah's closing line. */
+.m-line.m-short {
+  justify-content: center;
+  gap: 0.32em;
+}
+
+.m-word {
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+/* Selected ayahs read with the app's selection wash. */
+.m-word.m-selected {
+  background: var(--selection);
+}
+
+/* The gap inside a two-glyph word, drawn rather than spaced. */
+.m-gap {
+  display: inline-block;
+  width: 0.04em;
+  height: 1px;
+}
+
+/* The medallion closing an ayah: a disc painted behind the glyph (CSS cannot
+   fill the inside of a glyph), tinted with the theme's accent. */
+.m-end {
+  color: color-mix(in srgb, var(--accent) 82%, #000);
+  background: radial-gradient(
+    circle at 50% 56%,
+    color-mix(in srgb, var(--accent) 26%, var(--page)) 0 0.36em,
+    transparent 0.37em
+  );
+}
+
+[data-theme="night"] .m-end {
+  color: color-mix(in srgb, var(--accent) 92%, #fff);
+  background: radial-gradient(
+    circle at 50% 56%,
+    color-mix(in srgb, var(--accent) 30%, transparent) 0 0.36em,
+    transparent 0.37em
+  );
+}
+
+/* --- ornamental lines ----------------------------------------------------- */
+
+.m-line.m-surah,
+.m-line.m-basmalah {
+  align-items: center;
+  justify-content: center;
+}
+
+/* A header names a surah; the name must not spill. */
+.m-line.m-surah {
+  overflow: hidden;
+}
+
+/* Where a surah begins, its name is the event on the page: set larger than
+   the head that merely labels one, sized from its own line. */
+.m-line.m-surah .ph-surah {
+  line-height: 1;
+  font-size: calc(var(--m-line-h) * 0.95);
+  color: var(--ink);
+}
+
+/* The basmalah band: one calligraphic line in its own face, centred. */
+.m-basmalah-run {
+  font-family: "QCF-BSML", serif;
+  color: color-mix(in srgb, var(--accent) 85%, var(--ink));
+  line-height: 1;
+  white-space: pre;
+  cursor: default;
+}
+
+[data-theme="night"] .m-basmalah-run {
+  color: var(--accent);
+}
+
+/* --- folio ---------------------------------------------------------------- */
+
+.sheet-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 8px;
+}
+
+.folio {
+  font-family: var(--font-sans);
+  font-size: clamp(0.7rem, calc(100cqw * 0.018), 0.82rem);
+  font-weight: 600;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- pending / failed sheets ---------------------------------------------- */
+
+/* A sheet's lines stay hidden until its own font is in and the lines have
+   been settled: unshaped glyph codes would measure and paint wrong. */
+.mushaf:not(:empty):not(.ready) {
+  visibility: hidden;
+}
+
+.mushaf:empty {
+  min-height: calc(var(--m-lines, 15) * var(--m-line-h));
+}

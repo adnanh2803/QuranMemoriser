@@ -126,10 +126,26 @@ export const mushafLayoutBasmalahSchema = z.object({
 })
 export type MushafLayoutBasmalah = z.infer<typeof mushafLayoutBasmalahSchema>
 
+/** Type-size scale of a QCF encoding: line width in ems and centre threshold. */
+export const mushafFitSchema = z.object({
+  body: z.number(),
+  centreBelow: z.number(),
+})
+export type MushafFit = z.infer<typeof mushafFitSchema>
+
 export const mushafLayoutFileSchema = z.object({
   /** The basmalah band's glyph slots (identical on every page it appears). */
   basmalah: mushafLayoutBasmalahSchema,
   pages: z.record(z.string().regex(/^\d{1,3}$/), z.array(mushafLayoutItemSchema).min(1)),
+  /** Scale metadata per encoding (v1 is the one the app draws). */
+  fit: z
+    .object({
+      body: z.object({ v1: z.number(), v2: z.number() }),
+      centreBelow: z.object({ v1: z.number(), v2: z.number() }),
+    })
+    .optional(),
+  /** The page each of the 30 juz opens on (navigation + running head). */
+  juzPages: z.array(pageNumberSchema).length(30).optional(),
 })
 export type MushafLayoutFile = z.infer<typeof mushafLayoutFileSchema>
 
@@ -204,6 +220,16 @@ export const pageChunkSchema = z.object({
   lines: z.array(mushafLineSchema).min(8).max(15),
 })
 export type PageChunk = z.infer<typeof pageChunkSchema>
+
+/**
+ * Reader-wide constants (public/data/meta.json): the page each juz opens on
+ * and the QCF v1 type scale the whole mushaf is set at.
+ */
+export const mushafMetaSchema = z.object({
+  juzPages: z.array(pageNumberSchema).length(30),
+  fit: mushafFitSchema,
+})
+export type MushafMeta = z.infer<typeof mushafMetaSchema>
 
 /** Full Quran metadata row (public/data/ayahs.json entries). */
 export const ayahMetaSchema = z.object({

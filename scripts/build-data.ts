@@ -45,6 +45,7 @@ import {
   ayahsFileSchema,
   type MushafLayoutFile,
   mushafLayoutFileSchema,
+  mushafMetaSchema,
   type PageChunk,
   pageChunkSchema,
   parseVerseKey,
@@ -549,8 +550,18 @@ async function main(): Promise<void> {
   surahsFileSchema.parse(surahs)
   ayahsFileSchema.parse(ayahs)
 
+  const meta = {
+    juzPages: sources.layout.juzPages,
+    fit: {
+      body: sources.layout.fit?.body.v1,
+      centreBelow: sources.layout.fit?.centreBelow.v1,
+    },
+  }
+  mushafMetaSchema.parse(meta)
+
   const surahsBytes = await writeJson(path.join(OUT_DATA, "surahs.json"), surahs)
   const ayahsBytes = await writeJson(path.join(OUT_DATA, "ayahs.json"), ayahs)
+  const metaBytes = await writeJson(path.join(OUT_DATA, "meta.json"), meta)
 
   // --- informational diff reports (print layout vs upstream conventions) ---
   const apiPageDiffs = sources.verses.filter(
@@ -588,6 +599,10 @@ async function main(): Promise<void> {
     path.join(CACHE, "fonts", "uthmanic-hafs.woff2"),
     path.join(OUT_FONTS, "uthmanic-hafs.woff2"),
   )
+  await copyFile(
+    path.join(CACHE, "fonts", "sura-names.woff2"),
+    path.join(OUT_FONTS, "sura-names.woff2"),
+  )
 
   if (problems.length > 0) {
     console.error(`\n${problems.length} problem(s):`)
@@ -597,8 +612,9 @@ async function main(): Promise<void> {
 
   console.log(`surahs.json: ${(surahsBytes / 1024).toFixed(1)} KB`)
   console.log(`ayahs.json: ${(ayahsBytes / 1024).toFixed(1)} KB`)
+  console.log(`meta.json: ${(metaBytes / 1024).toFixed(1)} KB`)
   console.log(`page chunks: ${(totalChunkBytes / 1024 / 1024).toFixed(2)} MB (604 files)`)
-  console.log(`fonts copied: ${fontCount} page fonts + basmalah + uthmanic-hafs`)
+  console.log(`fonts copied: ${fontCount} page fonts + basmalah + sura-names + uthmanic-hafs`)
 }
 
 if (

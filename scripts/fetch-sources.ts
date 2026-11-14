@@ -4,6 +4,7 @@
  * Sources (all free, no API keys):
  * - QUL-derived Madinah mushaf layout (ahmad-anbarje/Quran-On-Web), pinned
  *   to a commit and a content hash — the print truth for pages/lines/slots
+ *   and the ornamental surah-name font
  * - Quran.com v4 API — verses, words, glyph codes, metadata (604 page files)
  * - Quran.com v4 API — chapter metadata (114 surahs)
  * - mustafa0x/qpc-fonts — KFGQPC QCF v1 page fonts (604), basmalah font,
@@ -34,13 +35,16 @@ const FONT_TABLE_URL = "https://raw.githubusercontent.com/mustafa0x/qpc-fonts/ma
 const UTHMANIC_HAFS_URL =
   "https://static.qurancdn.com/fonts/quran/hafs/uthmanic_hafs/UthmanicHafs1Ver18.woff2"
 
+/** Base for assets taken from the pinned reference repository (MIT). */
+const QURAN_ON_WEB_BASE =
+  "https://raw.githubusercontent.com/ahmad-anbarje/Quran-On-Web/aeeaea044fd5e1610ce6b4ba4c3cb4f8dc660986"
+
 /**
  * The QUL-derived Madinah mushaf layout: 604 pages × 15 line items with the
  * KFGQPC QCF v1 slot glyphs exactly as printed. Pinned to a commit so the
  * layout can never drift silently; the content hash must also match.
  */
-const MUSHAF_LAYOUT_URL =
-  "https://raw.githubusercontent.com/ahmad-anbarje/Quran-On-Web/aeeaea044fd5e1610ce6b4ba4c3cb4f8dc660986/public/data/mushaf.json"
+const MUSHAF_LAYOUT_URL = `${QURAN_ON_WEB_BASE}/public/data/mushaf.json`
 const MUSHAF_LAYOUT_SHA256 = "951a18ed0fa2ee5809908030cf4041bdb56421860df2322fc0586dae32558b52"
 
 const RETRIES = 3
@@ -264,6 +268,18 @@ async function main(): Promise<void> {
       await cachedDownload(
         path.join("fonts", "uthmanic-hafs.woff2"),
         UTHMANIC_HAFS_URL,
+        manifest,
+        woff2,
+      )
+      if (manifest.size > before) downloaded++
+    }),
+  )
+  fontJobs.push(
+    limit(async () => {
+      const before = manifest.size
+      await cachedDownload(
+        path.join("fonts", "sura-names.woff2"),
+        `${QURAN_ON_WEB_BASE}/public/fonts/sura-names.woff2`,
         manifest,
         woff2,
       )

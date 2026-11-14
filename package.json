@@ -6,6 +6,7 @@
   "description": "Offline-first Madani Mushaf reader with verse selection",
   "scripts": {
     "dev": "vite",
+    "prebuild": "npm run data:fetch && npm run data:build",
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
