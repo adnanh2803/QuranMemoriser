@@ -50,6 +50,16 @@
       }
     },
     {
+      "includes": ["tests/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noNonNullAssertion": "off"
+          }
+        }
+      }
+    },
+    {
       "includes": ["src/app.css"],
       "linter": {
         "rules": {

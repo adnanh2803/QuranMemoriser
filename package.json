@@ -14,8 +14,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "data:fetch": "node scripts/fetch-sources.mjs",
-    "data:build": "node scripts/build-data.mjs"
+    "data:fetch": "node scripts/fetch-sources.ts",
+    "data:build": "node scripts/build-data.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.7",

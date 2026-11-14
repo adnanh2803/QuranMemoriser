@@ -6,7 +6,7 @@ dist/
 coverage/
 
 # Generated Quran data (rebuild via `npm run data:fetch && npm run data:build`)
-src/data/generated/
+public/data/
 public/fonts/
 
 # Downloaded source cache
