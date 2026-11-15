@@ -22,9 +22,11 @@ let toastTimer: ReturnType<typeof setTimeout> | null = null
 
 const count = $derived(selection.size)
 const pending = $derived(selection.pending)
+/** The marked start's hint: where the range begins, and what comes next. */
+const pendingLabel = $derived(
+  pending ? `${pending.surah}:${pending.ayah} · word ${pending.word} — tap the end` : "",
+)
 const selectionLabel = $derived.by(() => {
-  // A marked start waits for the end tap; guide the user there.
-  if (pending) return `Start ${pending.surah}:${pending.ayah} · word ${pending.word} — tap the end`
   // A run that covers its verses from the first word to the end reads as
   // verses; anything shorter reads by its printed slots.
   if (!selection.wholeVerses) return `${count} ${count === 1 ? "word" : "words"} selected`
@@ -112,9 +114,20 @@ function bookmarkSelected(): void {
     class="fixed bottom-6 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-hairline bg-surface-raised/95 py-2 pr-2 pl-4 shadow-lg backdrop-blur"
     role="status"
   >
-    <span class="text-sm whitespace-nowrap text-ink">
-      {selectionLabel}
-    </span>
+    {#if pending}
+      <span
+        class="rounded-full bg-accent px-2 py-0.5 text-xs font-semibold tracking-wide text-white uppercase"
+      >
+        Start
+      </span>
+      <span class="text-sm whitespace-nowrap text-ink">
+        {pendingLabel}
+      </span>
+    {:else}
+      <span class="text-sm whitespace-nowrap text-ink">
+        {selectionLabel}
+      </span>
+    {/if}
     {#if !pending}
       <button
         class="rounded-full bg-accent px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90 active:scale-95"

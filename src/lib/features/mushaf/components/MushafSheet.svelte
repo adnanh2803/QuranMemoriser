@@ -42,20 +42,6 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
   let longPressFired = false
 
   const lineCount = $derived(chunk?.lines.length ?? (page <= 2 ? 8 : 15))
-  /** Each printed row's number in the left margin, 1-based down the page,
-   * with its Arabic-Indic label ready for the circle. */
-  const rowNumbers = $derived.by(() => {
-    const numbers = new Map<number, { n: number; label: string }>()
-    if (!chunk) return numbers
-    let row = 0
-    for (let index = 0; index < chunk.lines.length; index++) {
-      if (chunk.lines[index]?.kind === "words") {
-        row++
-        numbers.set(index, { n: row, label: arabicNumber.format(row) })
-      }
-    }
-    return numbers
-  })
   /** The surah the running head names: the one at the top of the page. */
   const headSurah = $derived.by(() => {
     if (!chunk) return null
@@ -218,26 +204,11 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
       longPressFired = false
       return
     }
-    // The word wins over the row underneath it.
     event.stopPropagation()
     // Tapping a word selects its verse from the first word through it; the
     // verse-end medallion is the last slot, so it selects the whole verse.
     // Shift-tap, Ctrl/Cmd+click or a long press extends the run instead.
     onSelect({ kind: "word", word: wordIdentity(word) }, event.shiftKey || event.ctrlKey || event.metaKey)
-  }
-
-  const tapRow = (words: MushafWord[]) => (event: MouseEvent) => {
-    const first = words[0]
-    const last = words.at(-1)
-    if (!first || !last) return
-    onSelect({ kind: "row", first: wordIdentity(first), last: wordIdentity(last) }, event.shiftKey)
-  }
-
-  const tapRowNumber = (words: MushafWord[]) => (event: MouseEvent) => {
-    // The circle is the row gesture itself: keep it from also reaching the
-    // row underneath, where the same tap would read as a second one.
-    event.stopPropagation()
-    tapRow(words)(event)
   }
 
   function beginLongPress(word: MushafWord, event: PointerEvent): void {
@@ -328,13 +299,6 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
     const lastLine = [...(chunk?.lines ?? [])].reverse().find((line) => line.kind === "words")
     return lastLine?.kind === "words" && lastLine.words.at(-1) === word
   }
-  /** A row reads as selected when its first and last slots both are: the run
-   * is contiguous, so that is the whole printed row. */
-  const isRowSelected = (words: MushafWord[]): boolean => {
-    const first = words[0]
-    const last = words.at(-1)
-    return !!first && !!last && isSelected(first) && isSelected(last)
-  }
 </script>
 
 <section
@@ -381,28 +345,8 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
             <span class="m-basmalah-run">{line.glyphs.split("|").join(" ")}</span>
           </div>
         {:else}
-          <!-- A printed row: its edge zones and the gaps between words select
-               the row, its words select through themselves. -->
-          <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
-          <div class="m-line m-ayah" onclick={tapRow(line.words)}>
-            {#if rowNumbers.get(lineIndex)}
-              <!-- The row's numbered circle in the left margin: a visible
-                   handle for the row gesture. -->
-              {@const row = rowNumbers.get(lineIndex)}
-              <button
-                type="button"
-                tabindex="-1"
-                class="m-row-num"
-                class:m-row-active={isRowSelected(line.words)}
-                aria-label={`Select row ${row?.n ?? ""}`}
-                aria-pressed={isRowSelected(line.words)}
-                onclick={tapRowNumber(line.words)}
-              >
-                <span class="m-row-dot">{row?.label ?? ""}</span>
-              </button>
-            {/if}
-            <i class="m-edge m-edge-start" aria-hidden="true"></i>
-            <i class="m-edge m-edge-end" aria-hidden="true"></i>
+          <!-- A printed line of words; only the words themselves are targets. -->
+          <div class="m-line m-ayah">
             {#each line.words as word, index (index)}
               <!-- The sheet is a picture of a page: pointer-driven whole-ayah
                    selection is deliberate, and the text block is hidden. -->

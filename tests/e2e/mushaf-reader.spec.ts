@@ -61,10 +61,19 @@ test("keeps the same sheet dimensions on short and full pages", async ({ page })
 test("marks a start, completes the range on the second tap", async ({ page }) => {
   await page.goto("/", { waitUntil: "domcontentloaded" })
 
-  // The first tap marks the start: it alone lights up and the banner waits.
+  // The first tap marks the start: it alone lights up, the banner names it
+  // with a Start chip, and the word waits.
   await page.locator('.m-word[data-s="1"][data-a="1"]').nth(1).click()
+  await expect(page.getByRole("status")).toContainText("Start")
   await expect(page.getByRole("status")).toContainText("tap the end")
   await expect(page.locator(".m-word.m-selected")).toHaveCount(1)
+
+  // The marked word carries the start design: an accent ring drawn around it.
+  const ring = await page
+    .locator(".m-word.m-pending")
+    .first()
+    .evaluate((word) => getComputedStyle(word, "::after").boxShadow)
+  expect(ring).not.toBe("none")
 
   // The second tap ends the selection: everything between, in either order.
   await page.locator('.m-word[data-s="1"][data-a="1"]').nth(3).click()
@@ -127,13 +136,6 @@ test("marks a start, completes the range on the second tap", async ({ page }) =>
     })
   expect(remainingHighlightGap).toBeLessThanOrEqual(1)
 
-  // Tapping a row's side selects the whole printed row: here 1:5 in full and
-  // 1:6's first word — six slots across two verses.
-  await page.getByRole("button", { name: "Clear" }).click()
-  await page.locator(".m-line.m-ayah").nth(3).locator(".m-edge-end").click()
-  await expect(page.getByRole("status")).toContainText("6 words selected")
-  await expect(page.locator(".m-word.m-selected")).toHaveCount(6)
-
   // A long press extends the marked start through the word (the touch shift).
   await page.getByRole("button", { name: "Clear" }).click()
   await expect(page.getByRole("status")).toHaveCount(0)
@@ -186,33 +188,4 @@ test("marks a start, completes the range on the second tap", async ({ page }) =>
   await page.locator('.m-word[data-s="1"][data-a="4"].m-end').click()
   await page.keyboard.up("Shift")
   await expect(page.getByRole("status")).toContainText("3 verses selected")
-})
-
-test("selects rows by their numbered circles and accumulates them", async ({ page }) => {
-  await page.goto("/", { waitUntil: "domcontentloaded" })
-  await page.waitForSelector('.sheet[data-page="1"] .mushaf.ready', { timeout: 20000 })
-
-  // Every printed row carries a numbered circle in the left margin.
-  const circles = page.locator(".m-row-num")
-  expect(await circles.count()).toBeGreaterThanOrEqual(4)
-
-  // Tapping a circle selects its whole row: the third printed row here is
-  // 1:3 in full plus 1:4 in full.
-  await circles.nth(2).click()
-  await expect(page.getByRole("status")).toContainText("2 verses selected")
-  await expect(page.locator(".m-word.m-selected")).toHaveCount(7)
-  await expect(circles.nth(2)).toHaveClass(/m-row-active/)
-
-  // Tapping another circle grows the selection across both rows: the fourth
-  // row adds 1:5 in full and 1:6's first word.
-  await circles.nth(3).click()
-  await expect(page.getByRole("status")).toContainText("13 words selected")
-  await expect(page.locator(".m-word.m-selected")).toHaveCount(13)
-  await expect(circles.nth(3)).toHaveClass(/m-row-active/)
-
-  // Tapping a circle whose row is inside the selection dismisses it.
-  await circles.nth(2).click()
-  await expect(page.getByRole("status")).toHaveCount(0)
-  await expect(page.locator(".m-word.m-selected")).toHaveCount(0)
-  await expect(circles.nth(2)).not.toHaveClass(/m-row-active/)
 })

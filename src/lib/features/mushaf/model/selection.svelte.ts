@@ -3,15 +3,14 @@
  * two taps.
  *
  * Tapping a word marks the selection's start: it alone lights up, softly,
- * and waits. The next tap — a word, a verse-end medallion, or a printed
- * row's edge — ends the selection, which then spans everything between the
- * two taps in either direction; tapping the marked word again completes a
- * one-word selection. A verse or a row tapped with no start marked selects
- * its whole unit at once, and can still serve as the end tap afterwards;
- * with a selection already standing, further unit taps accumulate — each
- * grows the run to cover its unit and everything between. Tapping inside a
- * finished selection dismisses it; shift-tap, Ctrl-click or a long press
- * extends instead.
+ * and waits. The next tap — a word or a verse-end medallion — ends the
+ * selection, which then spans everything between the two taps in either
+ * direction; tapping the marked word again completes a one-word selection.
+ * A verse tapped with no start marked selects its whole unit at once, and
+ * can still serve as the end tap afterwards; with a selection already
+ * standing, further verse taps accumulate — each grows the run to cover its
+ * verse and everything between. Tapping inside a finished selection
+ * dismisses it; shift-tap, Ctrl-click or a long press extends instead.
  *
  * The state lives in one small engine; every user action is a command object
  * executed against it with the command context, so the interactions stay
@@ -36,20 +35,17 @@ export interface SelectionRun {
 
 /**
  * Which printed target a gesture aimed at, before the context resolves the
- * slot indexes: a word of a verse, a whole verse, or a printed row.
+ * slot indexes: a word of a verse, or a whole verse.
  */
-export type RunCandidate =
-  | { kind: "word"; word: WordIdentity }
-  | { kind: "verse"; key: VerseKey }
-  | { kind: "row"; first: WordIdentity; last: WordIdentity }
+export type RunCandidate = { kind: "word"; word: WordIdentity } | { kind: "verse"; key: VerseKey }
 
 /** What one gesture resolves to: the slot it aims at and the unit it covers. */
 export interface GestureTarget {
-  /** What the gesture means: a single word, a whole verse, or a whole row. */
-  unit: "word" | "verse" | "row"
+  /** What the gesture means: a single word, or a whole verse. */
+  unit: "word" | "verse"
   /** The tapped slot (the word, or the verse's end medallion). */
   point: WordRef
-  /** The whole printed unit: the word alone, the whole verse, the whole row. */
+  /** The whole printed unit: the word alone, or the whole verse. */
   span: SelectionRun
 }
 
@@ -99,13 +95,6 @@ export function resolveTarget(
       const start = { surah, ayah, word: 1 }
       const end = { surah, ayah, word: total }
       return { unit: "verse", point: end, span: { start, end } }
-    }
-    case "row": {
-      const first = wordRefOf(candidate.first, context)
-      const last = wordRefOf(candidate.last, context)
-      if (!first || !last) return null
-      const span = { start: minWordRef(first, last), end: maxWordRef(first, last) }
-      return { unit: "row", point: span.end, span }
     }
   }
 }
@@ -236,8 +225,8 @@ export interface SelectionCommand {
 }
 
 /** Tap a printed target: mark a start, complete a selection, or dismiss.
- * Unit taps — a verse or a row — accumulate: each one grows the run to
- * cover itself and everything between it and the run. */
+ * A verse tap accumulates: it grows the run to cover itself and everything
+ * between it and the run. */
 export class TapRun implements SelectionCommand {
   readonly name = "tap-run"
 
@@ -266,15 +255,15 @@ export class TapRun implements SelectionCommand {
       engine.clear()
       return
     }
-    // A word marks the start and waits for the end; a verse or a row
-    // selects its whole unit at once.
+    // A word marks the start and waits for the end; a verse selects its
+    // whole unit at once.
     if (target.unit === "word") {
       engine.setPending(target.point)
       return
     }
     if (run) {
-      // Unit taps accumulate: another verse or row grows the run to cover
-      // both, from the earlier one's first slot to the later one's end.
+      // Verse taps accumulate: another verse grows the run to cover both,
+      // from the earlier one's first slot to the later one's end.
       applyRunSpan(
         {
           start: minWordRef(run.start, target.span.start),

@@ -46,11 +46,6 @@ const SLOT_INDEX: Record<string, number> = {
   "1:B5": 5,
   "1:C1": 1,
   "1:C2": 2,
-  "1:C3": 3,
-  "1:D1": 1,
-  "1:D2": 2,
-  "1:D3": 3,
-  "1:D4": 4,
   "2:G1": 1,
   "2:G4": 4,
 }
@@ -169,22 +164,6 @@ describe("TapRun", () => {
     expect(engine.size).toBe(5)
   })
 
-  it("completes through a printed row", () => {
-    const engine = new SelectionEngine()
-    run(engine, new TapRun(slot(1, 3, 1, "C1")))
-    run(
-      engine,
-      new TapRun({
-        kind: "row",
-        first: { surah: 1, ayah: 3, page: 1, glyph: "C3" },
-        last: { surah: 1, ayah: 4, page: 1, glyph: "D3" },
-      }),
-    )
-    expect(engine.verseKeys()).toEqual(["1:3", "1:4"])
-    expect(engine.size).toBe(6)
-    expect(engine.wholeVerses).toBe(false)
-  })
-
   it("selects a whole verse at once from the ayah list", () => {
     const engine = new SelectionEngine()
     run(engine, new TapRun({ kind: "verse", key: "2:1" }))
@@ -192,71 +171,6 @@ describe("TapRun", () => {
     expect(engine.size).toBe(5)
     expect(engine.wholeVerses).toBe(true)
     expect(engine.verseKeys()).toEqual(["2:1"])
-  })
-
-  it("selects a whole row at once", () => {
-    const engine = new SelectionEngine()
-    run(
-      engine,
-      new TapRun({
-        kind: "row",
-        first: { surah: 1, ayah: 3, page: 1, glyph: "C3" },
-        last: { surah: 1, ayah: 4, page: 1, glyph: "D3" },
-      }),
-    )
-    expect(engine.verseKeys()).toEqual(["1:3", "1:4"])
-    expect(engine.size).toBe(4)
-  })
-
-  it("grows the selection when tapping another row's circle", () => {
-    const engine = new SelectionEngine()
-    run(
-      engine,
-      new TapRun({
-        kind: "row",
-        first: { surah: 1, ayah: 4, page: 1, glyph: "D1" },
-        last: { surah: 1, ayah: 4, page: 1, glyph: "D4" },
-      }),
-    )
-    run(
-      engine,
-      new TapRun({
-        kind: "row",
-        first: { surah: 1, ayah: 3, page: 1, glyph: "C3" },
-        last: { surah: 1, ayah: 4, page: 1, glyph: "D3" },
-      }),
-    )
-    expect(engine.run).toEqual({
-      start: { surah: 1, ayah: 3, word: 3 },
-      end: { surah: 1, ayah: 4, word: 4 },
-    })
-    expect(engine.size).toBe(5)
-    expect(engine.wholeVerses).toBe(false)
-  })
-
-  it("accumulates rows in either order", () => {
-    const engine = new SelectionEngine()
-    run(
-      engine,
-      new TapRun({
-        kind: "row",
-        first: { surah: 1, ayah: 3, page: 1, glyph: "C3" },
-        last: { surah: 1, ayah: 4, page: 1, glyph: "D3" },
-      }),
-    )
-    run(
-      engine,
-      new TapRun({
-        kind: "row",
-        first: { surah: 1, ayah: 4, page: 1, glyph: "D1" },
-        last: { surah: 1, ayah: 4, page: 1, glyph: "D4" },
-      }),
-    )
-    expect(engine.run).toEqual({
-      start: { surah: 1, ayah: 3, word: 3 },
-      end: { surah: 1, ayah: 4, word: 4 },
-    })
-    expect(engine.size).toBe(5)
   })
 
   it("accumulates whole verses into one run", () => {
@@ -270,19 +184,6 @@ describe("TapRun", () => {
     expect(engine.wholeVerses).toBe(true)
     expect(engine.verseKeys()).toEqual(["2:1", "2:2"])
     expect(engine.size).toBe(9)
-  })
-
-  it("dismisses the selection when tapping a row inside it", () => {
-    const engine = new SelectionEngine()
-    const row: RunCandidate = {
-      kind: "row",
-      first: { surah: 1, ayah: 3, page: 1, glyph: "C3" },
-      last: { surah: 1, ayah: 4, page: 1, glyph: "D3" },
-    }
-    run(engine, new TapRun(row))
-    run(engine, new TapRun(row))
-    expect(engine.run).toBeNull()
-    expect(engine.size).toBe(0)
   })
 
   it("dismisses the selection when tapping inside it", () => {
@@ -331,19 +232,13 @@ describe("ExtendRun", () => {
     expect(engine.size).toBe(9)
   })
 
-  it("extends through a row's far edge", () => {
+  it("extends from the marked start through a whole verse", () => {
     const engine = new SelectionEngine()
     run(engine, new TapRun(slot(1, 1, 1, "A2")))
-    run(
-      engine,
-      new ExtendRun({
-        kind: "row",
-        first: { surah: 1, ayah: 4, page: 1, glyph: "D1" },
-        last: { surah: 1, ayah: 4, page: 1, glyph: "D4" },
-      }),
-    )
+    run(engine, new ExtendRun({ kind: "verse", key: "1:4" }))
     expect(engine.verseKeys()).toEqual(["1:1", "1:2", "1:3", "1:4"])
     expect(engine.wholeVerses).toBe(false)
+    expect(engine.size).toBe(16)
   })
 
   it("marks a start like a plain tap when nothing exists yet", () => {

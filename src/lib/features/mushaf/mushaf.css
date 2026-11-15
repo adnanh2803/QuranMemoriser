@@ -39,9 +39,6 @@
   --m-grid: 15;
   --m-line-h: calc(var(--m-line-ratio) * 1em);
   --sheet-pad-x: clamp(14px, calc(14px + (100vw - 640px) * 0.025), 30px);
-  /* The left margin strip that carries the row-number circles: extra room
-     past the type on that one side, taken out of the frame's slack. */
-  --sheet-gutter: clamp(16px, calc(16px + (100vw - 640px) * 0.03), 28px);
   --sheet-pad-t: 12px;
   --sheet-pad-b: 10px;
   /* Everything above the type that the height bound must leave room for:
@@ -53,16 +50,15 @@
      scrolls beats one that cannot be read). */
   --m-size: min(
     calc(var(--page-measure, 640px) / var(--m-base)),
-    calc((100cqw - var(--sheet-pad-x) * 2 - var(--sheet-gutter) - 12px) / var(--m-base)),
+    calc((100cqw - var(--sheet-pad-x) * 2 - 28px) / var(--m-base)),
     max(calc((100svh - var(--chrome-f)) / (var(--m-grid) * var(--m-line-ratio))), 13px)
   );
 
   position: relative;
-  width: calc(var(--m-size) * var(--m-base) + var(--sheet-pad-x) * 2 + var(--sheet-gutter));
+  width: calc(var(--m-size) * var(--m-base) + var(--sheet-pad-x) * 2);
   max-width: 100%;
   margin-inline: auto;
-  padding: var(--sheet-pad-t) var(--sheet-pad-x) var(--sheet-pad-b)
-    calc(var(--sheet-pad-x) + var(--sheet-gutter));
+  padding: var(--sheet-pad-t) var(--sheet-pad-x) var(--sheet-pad-b);
   background: var(--page);
   border: 1px solid var(--hairline);
   border-radius: 10px;
@@ -164,83 +160,6 @@
   cursor: pointer;
 }
 
-/* Row targets: the printed row's edges and the gaps between its words select
-   the row. The edge zones are invisible slivers at the line box's ends, above
-   the words only for hit-testing — tapping the far side of a row is the row
-   gesture, while the body of a word keeps the word gesture. */
-.m-line.m-ayah {
-  position: relative;
-  cursor: pointer;
-}
-
-.m-edge {
-  position: absolute;
-  inset-block: 0;
-  width: 0.42em;
-  z-index: 1;
-}
-
-.m-edge-start {
-  inset-inline-start: 0;
-}
-
-.m-edge-end {
-  inset-inline-end: 0;
-}
-
-/* Row numbers: one small circle per printed row in the left margin, a
-   visible handle for the row gesture. The tap area stays inside the gutter —
-   it must not reach over the line box, where the row's edge zone and the
-   verse-end medallion live. */
-.m-row-num {
-  position: absolute;
-  inset-block: 0;
-  inset-inline-end: calc(-1 * var(--sheet-gutter) + 1px);
-  width: calc(var(--sheet-gutter) - 2px);
-  display: grid;
-  place-items: center;
-  z-index: 2;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.m-row-num:focus {
-  outline: none;
-}
-
-.m-row-dot {
-  display: grid;
-  place-items: center;
-  width: 2.25em;
-  height: 2.25em;
-  border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--mushaf-ink) 30%, transparent);
-  background: var(--page);
-  color: var(--ink-muted);
-  font-family: var(--font-sans);
-  font-size: 0.45em;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-  transition:
-    background 0.15s,
-    border-color 0.15s,
-    color 0.15s;
-}
-
-.m-row-num:hover .m-row-dot {
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-  color: var(--ink);
-}
-
-.m-row-num.m-row-active .m-row-dot {
-  border-color: transparent;
-  background: var(--accent);
-  color: #fff;
-}
-
 /* Selected ayahs read with the app's selection wash. */
 .m-word.m-selected-run-start::before {
   position: absolute;
@@ -255,14 +174,38 @@
   pointer-events: none;
 }
 
-/* The marked start waits for the end tap: a softer, breathing wash. */
+/* The marked start waits for the end tap: a softer, breathing wash plus a
+   drawn ring that names the word as the selection's beginning — the halo
+   lifts it, the ring holds it, the pulse keeps it alive. */
 .m-word.m-pending.m-selected-run-start::before {
-  background: color-mix(in srgb, var(--selection) 65%, transparent);
+  background: color-mix(in srgb, var(--selection) 72%, transparent);
+}
+
+.m-word.m-pending::after {
+  content: "";
+  position: absolute;
+  inset: -0.14em -0.09em;
+  border-radius: 0.26em;
+  box-shadow:
+    0 0 0 0.05em color-mix(in srgb, var(--accent) 88%, transparent),
+    0 0 0.38em color-mix(in srgb, var(--accent) 42%, transparent);
+  pointer-events: none;
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .m-word.m-pending.m-selected-run-start::before {
     animation: m-pending-pulse 1.4s ease-in-out infinite;
+  }
+
+  .m-word.m-pending::after {
+    animation: m-pending-ring 0.28s ease-out backwards;
+  }
+}
+
+@keyframes m-pending-ring {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
   }
 }
 
