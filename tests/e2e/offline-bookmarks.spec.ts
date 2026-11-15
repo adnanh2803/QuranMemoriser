@@ -11,7 +11,7 @@ test("bookmarks a selection and jumps back to it", async ({ page }) => {
   await page.getByRole("button", { name: /^113:1/ }).click({ timeout: 10000 })
   await expect(page.locator('.sheet[data-page="604"]')).toBeVisible()
 
-  await page.locator('.sheet[data-page="604"] .m-word[data-s="113"][data-a="1"]').first().click()
+  await page.locator('.sheet[data-page="604"] .m-word[data-s="113"][data-a="1"].m-end').click()
   await expect(page.getByRole("status")).toContainText("113:1 selected")
   await page.getByRole("button", { name: "Bookmark", exact: true }).click()
   await expect(page.getByText(/Bookmarked 1 verse/)).toBeVisible()

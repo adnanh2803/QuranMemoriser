@@ -11,9 +11,11 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
 -->
 <script lang="ts">
   import type { MushafWord, PageChunk } from "../../../domain/schemas"
-  import { verseKey, type VerseKey } from "../../../domain/schemas"
+  import { verseKey } from "../../../domain/schemas"
   import type { PageFontRegistry } from "../data/page-fonts"
-  import type { SelectionEngine } from "../model/selection.svelte"
+  import type { WordIdentity } from "../data/mushaf-repository"
+  import type { RunCandidate, SelectionEngine, WordRef } from "../model/selection.svelte"
+  import type { WordLedger } from "../model/word-ledger"
   import { settleLines } from "../model/settle"
   import { SURAH_WORD, surahNameGlyph } from "../model/surah-names"
 
@@ -25,10 +27,12 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
     centreBelow: number
     fonts: PageFontRegistry
     selection: SelectionEngine
-    onTap: (key: VerseKey, extend: boolean) => void
+    /** Slot indexes within verses, for word-granular selection. */
+    ledger: WordLedger | null
+    onSelect: (candidate: RunCandidate, extend: boolean) => void
   }
 
-  let { page, chunk, juz, fitBody, centreBelow, fonts, selection, onTap }: Props = $props()
+  let { page, chunk, juz, fitBody, centreBelow, fonts, selection, ledger, onSelect }: Props = $props()
 
   let box = $state<HTMLDivElement | null>(null)
   let ready = $state(false)
@@ -180,12 +184,18 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
   })
 
   $effect(() => {
-    selection.mode
-    selection.keys()
-    selection.wordKeys()
+    void selection.run
+    void selection.size
     const el = box
     if (!el || !fontReady) return
     requestAnimationFrame(() => updateSelectionRunWidths(el))
+  })
+
+  const wordIdentity = (word: MushafWord): WordIdentity => ({
+    surah: word.s,
+    ayah: word.a,
+    page,
+    glyph: word.g,
   })
 
   const tapWord = (word: MushafWord) => (event: MouseEvent) => {
@@ -193,20 +203,23 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
       longPressFired = false
       return
     }
-    // A tap selects the whole ayah — the primary flow, with copy and bookmark.
-    // A word-level pick stays available: long-press on touch, Ctrl/Cmd+click
-    // with a mouse.
-    if (event.ctrlKey || event.metaKey || event.altKey) {
-      selection.setMode("word")
-      selection.toggleWord(`${page}:${word.s}:${word.a}:${word.g}`)
-      return
-    }
-    selection.setMode("ayah")
-    onTap(verseKey(word.s, word.a), event.shiftKey)
+    // The word wins over the row underneath it.
+    event.stopPropagation()
+    // Tapping a word selects its verse from the first word through it; the
+    // verse-end medallion is the last slot, so it selects the whole verse.
+    // Shift-tap, Ctrl/Cmd+click or a long press extends the run instead.
+    onSelect({ kind: "word", word: wordIdentity(word) }, event.shiftKey || event.ctrlKey || event.metaKey)
+  }
+
+  const tapRow = (words: MushafWord[]) => (event: MouseEvent) => {
+    const first = words[0]
+    const last = words.at(-1)
+    if (!first || !last) return
+    onSelect({ kind: "row", first: wordIdentity(first), last: wordIdentity(last) }, event.shiftKey)
   }
 
   function beginLongPress(word: MushafWord, event: PointerEvent): void {
-    if (event.pointerType === "mouse" || word.e) return
+    if (event.pointerType === "mouse") return
     stopLongPress()
     longPressFired = false
     longPressOrigin = { x: event.clientX, y: event.clientY }
@@ -214,8 +227,8 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
       longPressTimer = null
       longPressOrigin = null
       longPressFired = true
-      selection.setMode("word")
-      selection.toggleWord(`${page}:${word.s}:${word.a}:${word.g}`)
+      // The touch equivalent of shift-tap: extend the run through the word.
+      onSelect({ kind: "word", word: wordIdentity(word) }, true)
     }, 450)
   }
 
@@ -239,10 +252,14 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
   }
 
   const isEnd = (word: MushafWord): boolean => word.e === true
-  const isSelected = (word: MushafWord): boolean =>
-    selection.mode === "word"
-      ? selection.hasWord(`${page}:${word.s}:${word.a}:${word.g}`)
-      : selection.has(verseKey(word.s, word.a))
+  const wordRef = (word: MushafWord): WordRef | null => {
+    const index = ledger?.wordIndex(`${page}:${word.g}`)
+    return index === undefined ? null : { surah: word.s, ayah: word.a, word: index }
+  }
+  const isSelected = (word: MushafWord): boolean => {
+    const ref = wordRef(word)
+    return ref !== null && selection.isWordSelected(ref)
+  }
   const isSelectedStart = (words: MushafWord[], index: number): boolean => {
     const word = words[index]
     if (!word || !isSelected(word)) return false
@@ -258,14 +275,14 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
   const continuesFromPreviousLine = (lineIndex: number, words: MushafWord[]): boolean => {
     const first = words[0]
     const previousLine = chunk?.lines[lineIndex - 1]
-    if (selection.mode !== "ayah" || !first || previousLine?.kind !== "words") return false
+    if (!first || previousLine?.kind !== "words") return false
     const previous = previousLine.words.at(-1)
     return !!previous && verseKey(first.s, first.a) === verseKey(previous.s, previous.a) && isSelected(first)
   }
   const continuesToNextLine = (lineIndex: number, words: MushafWord[]): boolean => {
     const last = words.at(-1)
     const nextLine = chunk?.lines[lineIndex + 1]
-    if (selection.mode !== "ayah" || !last || nextLine?.kind !== "words") return false
+    if (!last || nextLine?.kind !== "words") return false
     const next = nextLine.words[0]
     return !!next && verseKey(last.s, last.a) === verseKey(next.s, next.a) && isSelected(last)
   }
@@ -323,8 +340,12 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
             <span class="m-basmalah-run">{line.glyphs.split("|").join(" ")}</span>
           </div>
         {:else}
+          <!-- A printed row: its edge zones and the gaps between words select
+               the row, its words select through themselves. -->
           <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
-          <div class="m-line m-ayah">
+          <div class="m-line m-ayah" onclick={tapRow(line.words)}>
+            <i class="m-edge m-edge-start" aria-hidden="true"></i>
+            <i class="m-edge m-edge-end" aria-hidden="true"></i>
             {#each line.words as word, index (index)}
               <!-- The sheet is a picture of a page: pointer-driven whole-ayah
                    selection is deliberate, and the text block is hidden. -->
@@ -338,8 +359,8 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
                 class:m-selected-run-start={isSelectedStart(line.words, index)}
                 class:m-selected-continuation-start={index === 0 && continuesFromPreviousLine(lineIndex, line.words)}
                 class:m-selected-continuation-end={index === line.words.length - 1 && continuesToNextLine(lineIndex, line.words)}
-                class:m-selected-page-edge-start={selection.mode === "ayah" && isSelected(word) && isPageFirstWord(word)}
-                class:m-selected-page-edge-end={selection.mode === "ayah" && isSelected(word) && isPageLastWord(word)}
+                class:m-selected-page-edge-start={isSelected(word) && isPageFirstWord(word)}
+                class:m-selected-page-edge-end={isSelected(word) && isPageLastWord(word)}
                 data-s={word.s}
                 data-a={word.a}
                 data-g={word.g}

@@ -12,8 +12,8 @@
 import { createReadStream, existsSync } from "node:fs"
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises"
 import { createServer } from "node:https"
-import { extname, join, resolve, sep } from "node:path"
 import { networkInterfaces } from "node:os"
+import { extname, join, resolve, sep } from "node:path"
 import process from "node:process"
 import selfsigned from "selfsigned"
 
@@ -117,7 +117,9 @@ const server = createServer(tls, async (request, response) => {
     response.end()
     return
   }
-  createReadStream(file).on("error", () => response.destroy()).pipe(response)
+  createReadStream(file)
+    .on("error", () => response.destroy())
+    .pipe(response)
 })
 
 server.listen(PORT, "0.0.0.0", () => {

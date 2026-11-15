@@ -5,26 +5,27 @@
 <script lang="ts">
 import { parseVerseKey, type VerseKey } from "../../../domain/schemas"
 import type { BookmarkRepository } from "../data/bookmark-repository"
-import type { CommandContext, MushafRepository } from "../data/mushaf-repository"
+import type { MushafRepository } from "../data/mushaf-repository"
 import type { SelectionEngine } from "../model/selection.svelte"
 
 interface Props {
   selection: SelectionEngine
   repository: MushafRepository
   bookmarks: BookmarkRepository
-  context: Promise<CommandContext>
   onBookmarks: (keys: VerseKey[]) => void
 }
 
-let { selection, repository, bookmarks, context, onBookmarks }: Props = $props()
+let { selection, repository, bookmarks, onBookmarks }: Props = $props()
 
 let copied = $state<string | null>(null)
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
 const count = $derived(selection.size)
 const selectionLabel = $derived.by(() => {
-  if (selection.mode === "word") return `${count} ${count === 1 ? "word" : "words"} selected`
-  const keys = selection.keys()
+  // A run that covers its verses from the first word to the end reads as
+  // verses; anything shorter reads by its printed slots.
+  if (!selection.wholeVerses) return `${count} ${count === 1 ? "word" : "words"} selected`
+  const keys = selection.verseKeys()
   return keys.length === 1 ? `${keys[0]} selected` : `${keys.length} verses selected`
 })
 
@@ -35,12 +36,8 @@ function flash(message: string): void {
 }
 
 async function copySelected(): Promise<void> {
-  const keys = selection.keys()
+  const keys = selection.verseKeys()
   if (keys.length === 0) return
-  const commandContext = await context
-  const ordered = [...keys].sort(
-    (a, b) => (commandContext.indexOf(a) ?? 0) - (commandContext.indexOf(b) ?? 0),
-  )
   const [ayahs, surahs] = await Promise.all([repository.ayahs(), repository.surahs()])
   const byKey = new Map<string, string>()
   for (const ayah of ayahs) {
@@ -48,7 +45,7 @@ async function copySelected(): Promise<void> {
   }
   const lines: string[] = []
   let openSurah = 0
-  for (const key of ordered) {
+  for (const key of keys) {
     const parsed = parseVerseKey(key)
     if (!parsed) continue
     const [surah, ayah] = parsed
@@ -62,7 +59,7 @@ async function copySelected(): Promise<void> {
   }
   const copiedText = lines.join("\n")
   if (await writeClipboard(copiedText)) {
-    flash(`Copied ${ordered.length} ${ordered.length === 1 ? "verse" : "verses"}`)
+    flash(`Copied ${keys.length} ${keys.length === 1 ? "verse" : "verses"}`)
   } else {
     flash("Copy failed")
   }
@@ -97,9 +94,10 @@ function clearSelection(): void {
 }
 
 function bookmarkSelected(): void {
+  const keys = selection.verseKeys()
   try {
-    onBookmarks(bookmarks.add(selection.keys()))
-    flash(`Bookmarked ${selection.size} ${selection.size === 1 ? "verse" : "verses"}`)
+    onBookmarks(bookmarks.add(keys))
+    flash(`Bookmarked ${keys.length} ${keys.length === 1 ? "verse" : "verses"}`)
   } catch (error) {
     flash(error instanceof Error ? error.message : String(error))
   }
@@ -114,7 +112,6 @@ function bookmarkSelected(): void {
     <span class="text-sm whitespace-nowrap text-ink">
       {selectionLabel}
     </span>
-    {#if selection.mode === "ayah"}
     <button
       class="rounded-full bg-accent px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90 active:scale-95"
       onclick={copySelected}
@@ -127,7 +124,6 @@ function bookmarkSelected(): void {
     >
       Bookmark
     </button>
-    {/if}
     <button
       class="rounded-full px-3 py-1.5 text-sm text-ink-muted transition hover:bg-accent-soft hover:text-ink active:scale-95"
       onclick={clearSelection}

@@ -17,14 +17,29 @@ import {
   surahsFileSchema,
   type VerseKey,
   verseKey,
+  wordIndexFileSchema,
 } from "../../../domain/schemas"
+import { ledgerFromWordIndex, type WordLedger } from "../model/word-ledger"
 
-/** Keys for the verse-selection range commands, derived from the surah index. */
+/** A printed slot as the sheet knows it, before the ledger resolves it. */
+export interface WordIdentity {
+  surah: number
+  ayah: number
+  page: number
+  /** The slot's QCF glyph code string (unique within its page). */
+  glyph: string
+}
+
+/** Keys the selection commands resolve against: verse order and word order. */
 export interface CommandContext {
   /** 1-based global index of a verse key, or undefined if unknown. */
   indexOf(key: VerseKey): number | undefined
   /** Verse keys between two global indexes, inclusive, in mushaf order. */
   keysBetween(fromIndex: number, toIndex: number): VerseKey[]
+  /** 1-based slot index of a word within its verse, or undefined if unknown. */
+  wordIndex(word: WordIdentity): number | undefined
+  /** Total printed slots of a verse (words plus the end medallion). */
+  verseWordCount(key: VerseKey): number | undefined
 }
 
 /** The Uthmani dagger alif and its tatweel ligature. */
@@ -56,6 +71,7 @@ export class MushafRepository {
   private ayahsPromise: Promise<AyahMeta[]> | null = null
   private metaPromise: Promise<MushafMeta> | null = null
   private searchIndexPromise: Promise<SearchEntry[]> | null = null
+  private ledgerPromise: Promise<WordLedger> | null = null
 
   /** The layout chunk of one page, fetched once and cached. */
   pageChunk(page: number): Promise<PageChunk> {
@@ -144,9 +160,10 @@ export class MushafRepository {
     return juz
   }
 
-  /** The command context verse selection ranges are resolved against. */
+  /** The command context selection commands resolve against: verse order
+   *  from the surah index and slot order from the word ledger. */
   async commandContext(): Promise<CommandContext> {
-    const surahs = await this.surahs()
+    const [surahs, ledger] = await Promise.all([this.surahs(), this.wordLedger()])
     const baseOfSurah = (surah: number): number => {
       let base = 0
       for (const summary of surahs) {
@@ -176,6 +193,23 @@ export class MushafRepository {
         }
         return keys
       },
+      wordIndex: (word) => ledger.wordIndex(`${word.page}:${word.glyph}`),
+      verseWordCount: (key) => ledger.verseWordCount(key),
     }
+  }
+
+  /**
+   * The word ledger over the shipped word-index file: each slot's index
+   * within its verse and each verse's slot total, built offline by the data
+   * pipeline so selection resolves from one fetch.
+   */
+  wordLedger(): Promise<WordLedger> {
+    this.ledgerPromise ??= fetch("/data/word-index.json")
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status} for word index`)
+        return response.json()
+      })
+      .then((json: unknown) => ledgerFromWordIndex(wordIndexFileSchema.parse(json)))
+    return this.ledgerPromise
   }
 }

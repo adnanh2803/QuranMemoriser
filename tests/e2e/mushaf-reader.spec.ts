@@ -58,14 +58,18 @@ test("keeps the same sheet dimensions on short and full pages", async ({ page })
   expect(fullPage.height).toBeCloseTo(shortPage.height, 1)
 })
 
-test("selects an ayah on tap, a word on long press, and a range on shift-click", async ({
-  page,
-}) => {
+test("selects through a word, a whole ayah by its number, a row by its edge", async ({ page }) => {
   await page.goto("/", { waitUntil: "domcontentloaded" })
 
-  // A tap selects the whole ayah — tap the first word of Al-Fatihah 1:1.
-  await page.locator('.m-word[data-s="1"][data-a="1"]').first().click()
+  // Tapping a word selects the verse from its first word through that word.
+  await page.locator('.m-word[data-s="1"][data-a="1"]').nth(1).click()
+  await expect(page.getByRole("status")).toContainText("2 words selected")
+  await expect(page.locator(".m-word.m-selected")).toHaveCount(2)
+
+  // Tapping the ayah number — the verse-end medallion — selects the whole verse.
+  await page.locator('.m-word[data-s="1"][data-a="1"].m-end').click()
   await expect(page.getByRole("status")).toContainText("1:1 selected")
+  await expect(page.locator(".m-word.m-selected")).toHaveCount(5)
 
   // The selected run paints one wash on the run-start word's ::before.
   const wash = await page
@@ -107,9 +111,17 @@ test("selects an ayah on tap, a word on long press, and a range on shift-click",
     })
   expect(remainingHighlightGap).toBeLessThanOrEqual(1)
 
-  // A long press picks a single word (the precision tool for memorisation).
-  const thirdAyahWord = page.locator('.m-word[data-s="1"][data-a="3"]').first()
-  await thirdAyahWord.dispatchEvent("pointerdown", {
+  // Tapping a row's side selects the whole printed row: here 1:5 in full and
+  // 1:6's first word — six slots across two verses.
+  await page.locator(".m-line.m-ayah").nth(3).locator(".m-edge-end").click()
+  await expect(page.getByRole("status")).toContainText("6 words selected")
+  await expect(page.locator(".m-word.m-selected")).toHaveCount(6)
+
+  // A long press extends the run through the word (the touch shift-tap).
+  await page.getByRole("button", { name: "Clear" }).click()
+  await expect(page.getByRole("status")).toHaveCount(0)
+  const firstOfFifth = page.locator('.m-word[data-s="1"][data-a="5"]').first()
+  await firstOfFifth.dispatchEvent("pointerdown", {
     pointerId: 1,
     isPrimary: true,
     pointerType: "touch",
@@ -117,7 +129,7 @@ test("selects an ayah on tap, a word on long press, and a range on shift-click",
     clientY: 120,
   })
   await page.waitForTimeout(550)
-  await thirdAyahWord.dispatchEvent("pointerup", {
+  await firstOfFifth.dispatchEvent("pointerup", {
     pointerId: 1,
     isPrimary: true,
     pointerType: "touch",
@@ -126,13 +138,30 @@ test("selects an ayah on tap, a word on long press, and a range on shift-click",
   })
   await expect(page.getByRole("status")).toContainText("1 word selected")
   await expect(page.locator(".m-word.m-selected")).toHaveCount(1)
+  await page.locator('.m-word[data-s="1"][data-a="5"]').nth(1).dispatchEvent("pointerdown", {
+    pointerId: 1,
+    isPrimary: true,
+    pointerType: "touch",
+    clientX: 160,
+    clientY: 120,
+  })
+  await page.waitForTimeout(550)
+  await page.locator('.m-word[data-s="1"][data-a="5"]').nth(1).dispatchEvent("pointerup", {
+    pointerId: 1,
+    isPrimary: true,
+    pointerType: "touch",
+    clientX: 160,
+    clientY: 120,
+  })
+  await expect(page.getByRole("status")).toContainText("2 words selected")
 
-  // Shift-click extends the ayah selection into a range.
+  // Shift-click extends the run to the whole verse clicked through its number.
   await page.getByRole("button", { name: "Clear" }).click()
   await expect(page.getByRole("status")).toHaveCount(0)
   await page.locator('.m-word[data-s="1"][data-a="2"]').first().click()
+  await expect(page.getByRole("status")).toContainText("1 word selected")
   await page.keyboard.down("Shift")
-  await page.locator('.m-word[data-s="1"][data-a="4"]').first().click()
+  await page.locator('.m-word[data-s="1"][data-a="4"].m-end').click()
   await page.keyboard.up("Shift")
   await expect(page.getByRole("status")).toContainText("3 verses selected")
 })

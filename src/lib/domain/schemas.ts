@@ -268,6 +268,17 @@ export type SurahSummary = z.infer<typeof surahSummarySchema>
 export const surahsFileSchema = z.array(surahSummarySchema).length(114)
 export const ayahsFileSchema = z.array(ayahMetaSchema).length(6236)
 
+/**
+ * The word index (public/data/word-index.json): each printed slot's 1-based
+ * index within its verse and each verse's slot total, derived at build time
+ * from the same page chunks. Word-granular selection resolves against it.
+ */
+export const wordIndexFileSchema = z.object({
+  verseSlots: z.record(z.string().min(1), z.number().int().min(1)),
+  slotIndex: z.record(z.string().min(1), z.number().int().min(1)),
+})
+export type WordIndexFile = z.infer<typeof wordIndexFileSchema>
+
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */

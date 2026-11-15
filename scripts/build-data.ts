@@ -29,6 +29,7 @@
  *  - public/data/surahs.json      (114 surah summaries, print pages)
  *  - public/data/ayahs.json       (6236 ayah metadata rows, print pages)
  *  - public/data/pages/pNNN.json  (604 page layout chunks)
+ *  - public/data/word-index.json  (slot indexes within verses, verse totals)
  *  - public/fonts/…               (604 QCF page fonts + basmalah + fallback)
  *
  * Run with:  node scripts/build-data.ts
@@ -51,7 +52,9 @@ import {
   parseVerseKey,
   type SurahSummary,
   surahsFileSchema,
+  wordIndexFileSchema,
 } from "../src/lib/domain/schemas.ts"
+import { buildWordIndex } from "../src/lib/features/mushaf/model/word-ledger.ts"
 import {
   buildPageChunk,
   flattenLayout,
@@ -519,10 +522,12 @@ async function main(): Promise<void> {
   const basmalahGlyphs = sources.layout.basmalah.v1
   let totalChunkBytes = 0
   const endSlotKeys = new Set<string>()
+  const builtChunks: PageChunk[] = []
   for (const layoutPage of mushafLayout.pages) {
     const chunk = buildPageChunk(layoutPage, walk, ayahKeys, basmalahGlyphs)
     pageChunkSchema.parse(chunk)
     problems.push(...checkChunk(chunk).slice(0, 5))
+    builtChunks.push(chunk)
 
     for (const line of chunk.lines) {
       if (line.kind !== "words") continue
@@ -543,6 +548,15 @@ async function main(): Promise<void> {
   if (endSlotKeys.size !== ayahKeys.length) {
     problems.push(`${endSlotKeys.size} unique end slots across chunks, expected ${ayahKeys.length}`)
   }
+
+  // --- word index: each slot's index within its verse, each verse's total ---
+  const wordIndex = buildWordIndex(builtChunks)
+  const indexedVerses = Object.keys(wordIndex.verseSlots).length
+  if (indexedVerses !== ayahKeys.length) {
+    problems.push(`${indexedVerses} verses indexed, expected ${ayahKeys.length}`)
+  }
+  wordIndexFileSchema.parse(wordIndex)
+  const wordIndexBytes = await writeJson(path.join(OUT_DATA, "word-index.json"), wordIndex)
 
   // --- build metadata files ---
   const surahs = buildSurahs(sources, walk)
@@ -612,6 +626,7 @@ async function main(): Promise<void> {
 
   console.log(`surahs.json: ${(surahsBytes / 1024).toFixed(1)} KB`)
   console.log(`ayahs.json: ${(ayahsBytes / 1024).toFixed(1)} KB`)
+  console.log(`word-index.json: ${(wordIndexBytes / 1024).toFixed(1)} KB`)
   console.log(`meta.json: ${(metaBytes / 1024).toFixed(1)} KB`)
   console.log(`page chunks: ${(totalChunkBytes / 1024 / 1024).toFixed(2)} MB (604 files)`)
   console.log(`fonts copied: ${fontCount} page fonts + basmalah + sura-names + uthmanic-hafs`)

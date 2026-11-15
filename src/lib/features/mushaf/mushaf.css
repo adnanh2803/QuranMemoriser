@@ -160,6 +160,30 @@
   cursor: pointer;
 }
 
+/* Row targets: the printed row's edges and the gaps between its words select
+   the row. The edge zones are invisible slivers at the line box's ends, above
+   the words only for hit-testing — tapping the far side of a row is the row
+   gesture, while the body of a word keeps the word gesture. */
+.m-line.m-ayah {
+  position: relative;
+  cursor: pointer;
+}
+
+.m-edge {
+  position: absolute;
+  inset-block: 0;
+  width: 0.42em;
+  z-index: 1;
+}
+
+.m-edge-start {
+  inset-inline-start: 0;
+}
+
+.m-edge-end {
+  inset-inline-end: 0;
+}
+
 /* Selected ayahs read with the app's selection wash. */
 .m-word.m-selected-run-start::before {
   position: absolute;

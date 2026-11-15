@@ -21,10 +21,12 @@ import type { CommandContext, MushafRepository } from "../data/mushaf-repository
 import type { PageFontRegistry } from "../data/page-fonts"
 import {
   dispatchSelection,
-  ExtendToAyah,
+  ExtendRun,
+  type RunCandidate,
   type SelectionEngine,
-  TapAyah,
+  TapRun,
 } from "../model/selection.svelte"
+import type { WordLedger } from "../model/word-ledger"
 import AyahList from "./AyahList.svelte"
 import MushafSheet from "./MushafSheet.svelte"
 import SelectionBanner from "./SelectionBanner.svelte"
@@ -64,6 +66,8 @@ let swipeOrigin: { x: number; y: number } | null = null
 let suppressTapUntil = 0
 /** All page chunks are loaded up front so page turns never wait on text data. */
 const chunks = new SvelteMap<number, PageChunk>()
+/** Slot indexes within verses, once every chunk has landed. */
+let ledger = $state<WordLedger | null>(null)
 
 const juz = $derived(meta ? repository.juzOfPage(current, meta) : null)
 const fitBody = $derived(meta?.fit.body ?? 19.76)
@@ -97,6 +101,7 @@ $effect(() => {
 })
 
 // The offline page chunks total only a few megabytes; keep them ready for turns.
+// The word ledger shares the same cached page promises and builds last.
 $effect(() => {
   let cancelled = false
   for (const page of pages) {
@@ -109,6 +114,12 @@ $effect(() => {
         if (!cancelled) loadError = error instanceof Error ? error.message : String(error)
       })
   }
+  repository.wordLedger().then(
+    (built) => {
+      if (!cancelled) ledger = built
+    },
+    () => {},
+  )
   return () => {
     cancelled = true
   }
@@ -295,8 +306,13 @@ function onKeydown(event: KeyboardEvent): void {
   }
 }
 
-function tapAyah(key: VerseKey, extend: boolean): void {
+/** Every selection gesture lands here: replace, or extend when asked. */
+function select(candidate: RunCandidate, extend: boolean): void {
   if (Date.now() < suppressTapUntil) return
+  dispatchSelection(selection, extend ? new ExtendRun(candidate) : new TapRun(candidate), context)
+}
+
+function tapAyah(key: VerseKey, extend: boolean): void {
   if (listView) {
     const ayah = ayahs.find((item) => `${item.surah}:${item.ayah}` === key)
     if (ayah) {
@@ -305,7 +321,7 @@ function tapAyah(key: VerseKey, extend: boolean): void {
       localStorage.setItem(LAST_PAGE_KEY, String(ayah.page))
     }
   }
-  dispatchSelection(selection, extend ? new ExtendToAyah(key) : new TapAyah(key), context)
+  select({ kind: "verse", key }, extend)
 }
 
 function cycleTheme(): void {
@@ -560,7 +576,8 @@ function cycleTheme(): void {
               {centreBelow}
               {fonts}
               {selection}
-              onTap={tapAyah}
+              {ledger}
+              onSelect={select}
             />
           </div>
         {/key}
@@ -568,5 +585,5 @@ function cycleTheme(): void {
     {/if}
   </main>
 
-  <SelectionBanner {selection} {repository} {bookmarks} {context} onBookmarks={(keys) => (savedBookmarks = keys)} />
+  <SelectionBanner {selection} {repository} {bookmarks} onBookmarks={(keys) => (savedBookmarks = keys)} />
 </div>
