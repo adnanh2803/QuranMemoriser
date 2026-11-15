@@ -40,7 +40,8 @@
   --ink-muted: #6f675c;
   --accent: #0f6b4f;
   --accent-soft: color-mix(in srgb, #0f6b4f 10%, transparent);
-  --selection: rgba(201, 162, 39, 0.22);
+  --selection: rgba(70, 78, 73, 0.12);
+  --selection-outline: rgba(70, 78, 73, 0.2);
   --hairline: rgba(30, 27, 22, 0.08);
   --page: #fffdf7;
   color-scheme: light;
@@ -55,7 +56,8 @@
   --ink-muted: #7a6a55;
   --accent: #0f6b4f;
   --accent-soft: color-mix(in srgb, #0f6b4f 12%, transparent);
-  --selection: rgba(201, 162, 39, 0.25);
+  --selection: rgba(76, 68, 57, 0.14);
+  --selection-outline: rgba(76, 68, 57, 0.22);
   --hairline: rgba(43, 33, 24, 0.1);
   --page: #fdf8ec;
   color-scheme: light;
@@ -70,7 +72,8 @@
   --ink-muted: #a39b8f;
   --accent: #c9a227;
   --accent-soft: color-mix(in srgb, #c9a227 12%, transparent);
-  --selection: rgba(201, 162, 39, 0.2);
+  --selection: rgba(221, 214, 196, 0.14);
+  --selection-outline: rgba(221, 214, 196, 0.2);
   --hairline: rgba(234, 228, 218, 0.1);
   --page: #211e1b;
   color-scheme: dark;

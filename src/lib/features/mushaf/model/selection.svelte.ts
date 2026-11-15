@@ -19,11 +19,13 @@ export interface SelectionCommand {
 /** The selection state. Reactive: reading it in a component tracks changes. */
 export class SelectionEngine {
   private readonly selected = new SvelteSet<VerseKey>()
+  private readonly selectedWords = new SvelteSet<string>()
+  mode = $state<"ayah" | "word">("ayah")
   private anchor = $state<VerseKey | null>(null)
 
   /** How many ayahs are selected. */
   get size(): number {
-    return this.selected.size
+    return this.mode === "word" ? this.selectedWords.size : this.selected.size
   }
 
   /** The ayah ranges extend from (null when the last action was a removal). */
@@ -33,6 +35,25 @@ export class SelectionEngine {
 
   has(key: VerseKey): boolean {
     return this.selected.has(key)
+  }
+
+  hasWord(key: string): boolean {
+    return this.selectedWords.has(key)
+  }
+
+  wordKeys(): string[] {
+    return [...this.selectedWords]
+  }
+
+  toggleWord(key: string): void {
+    if (this.selectedWords.has(key)) this.selectedWords.delete(key)
+    else this.selectedWords.add(key)
+  }
+
+  setMode(mode: "ayah" | "word"): void {
+    if (this.mode === mode) return
+    this.clear()
+    this.mode = mode
   }
 
   /** Selected keys in insertion order. */
@@ -55,12 +76,14 @@ export class SelectionEngine {
   /** Replace the whole selection (a range or a clear). */
   replace(keys: Iterable<VerseKey>, anchor: VerseKey | null): void {
     this.selected.clear()
+    this.selectedWords.clear()
     for (const key of keys) this.selected.add(key)
     this.anchor = anchor
   }
 
   clear(): void {
     this.selected.clear()
+    this.selectedWords.clear()
     this.anchor = null
   }
 }

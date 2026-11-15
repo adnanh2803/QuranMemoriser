@@ -14,8 +14,27 @@
   container-type: inline-size;
 }
 
+.page-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+.page-slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+
 .sheet {
   --m-base: var(--m-fit-body, 19.76);
+  --mushaf-ink: color-mix(in srgb, var(--ink) 82%, #777);
   --m-line-ratio: 1.92;
   --m-grid: 15;
   --m-line-h: calc(var(--m-line-ratio) * 1em);
@@ -24,7 +43,7 @@
   --sheet-pad-b: 10px;
   /* Everything above the type that the height bound must leave room for:
      top bar, sheet margin and the running head with its gap. */
-  --chrome-f: 118px;
+  --chrome-f: var(--reader-chrome, 172px);
 
   /* The type size: the smallest of the zoom asked for, the width the sheet
      actually got, and one whole page in the height (floored so a page that
@@ -47,12 +66,6 @@
     0 1px 2px rgb(0 0 0 / 0.06),
     0 10px 28px rgb(0 0 0 / 0.07);
   scroll-margin-top: 12px;
-}
-
-@media (max-width: 767px) {
-  .sheet {
-    --chrome-f: 184px;
-  }
 }
 
 /* --- running head: juz, surah, folio ------------------------------------ */
@@ -107,9 +120,13 @@
 
 .mushaf {
   direction: rtl;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   font-size: var(--m-size);
-  color: var(--ink);
+  color: var(--mushaf-ink);
   line-height: var(--m-line-h);
+  min-height: calc(var(--m-grid) * var(--m-line-h));
 
   /* A picture of a page: glyph codes copy as nothing, and a dragged
      selection would only confuse — whole-ayah selection is ours to draw. */
@@ -137,13 +154,45 @@
 }
 
 .m-word {
+  position: relative;
+  isolation: isolate;
   flex: 0 0 auto;
   cursor: pointer;
 }
 
 /* Selected ayahs read with the app's selection wash. */
-.m-word.m-selected {
+.m-word.m-selected-run-start::before {
+  position: absolute;
+  z-index: -1;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: calc(var(--m-selection-run-width, 100%) + var(--m-selection-run-to-line-end, 0px));
+  border-radius: 0.22em;
+  border: 0;
   background: var(--selection);
+  content: "";
+  pointer-events: none;
+}
+
+/* A verse can continue onto the next printed line. Keep that line break
+   square so the selected wash reads as one wrapped run. */
+.m-word.m-selected-continuation-start.m-selected-run-start::before {
+  inset-block-start: -0.08em;
+}
+
+.m-word.m-selected-continuation-end.m-selected-run-start::before {
+  inset-block-end: -0.08em;
+}
+
+.m-word.m-selected-page-edge-start::before {
+  inset-inline-start: calc(0px - var(--m-select-to-line-start, 0px));
+  width: calc(
+    var(--m-selection-run-width, 100%) +
+    var(--m-select-to-line-start, 0px) +
+    var(--m-selection-run-to-line-end, 0px)
+  );
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
 }
 
 /* The gap inside a two-glyph word, drawn rather than spaced. */
@@ -151,26 +200,6 @@
   display: inline-block;
   width: 0.04em;
   height: 1px;
-}
-
-/* The medallion closing an ayah: a disc painted behind the glyph (CSS cannot
-   fill the inside of a glyph), tinted with the theme's accent. */
-.m-end {
-  color: color-mix(in srgb, var(--accent) 82%, #000);
-  background: radial-gradient(
-    circle at 50% 56%,
-    color-mix(in srgb, var(--accent) 26%, var(--page)) 0 0.36em,
-    transparent 0.37em
-  );
-}
-
-[data-theme="night"] .m-end {
-  color: color-mix(in srgb, var(--accent) 92%, #fff);
-  background: radial-gradient(
-    circle at 50% 56%,
-    color-mix(in srgb, var(--accent) 30%, transparent) 0 0.36em,
-    transparent 0.37em
-  );
 }
 
 /* --- ornamental lines ----------------------------------------------------- */
@@ -184,27 +213,38 @@
 /* A header names a surah; the name must not spill. */
 .m-line.m-surah {
   overflow: hidden;
+  gap: 0.55em;
+}
+
+.m-line.m-surah::before,
+.m-line.m-surah::after {
+  content: "";
+  flex: 1 1 0;
+  min-width: 0.5em;
+  height: 0.42em;
+  opacity: 0.5;
+  background:
+    radial-gradient(circle, var(--mushaf-ink) 0 0.06em, transparent 0.07em) center / 0.3em 0.3em
+    no-repeat,
+    linear-gradient(var(--mushaf-ink), var(--mushaf-ink)) center / 100% 1px no-repeat;
 }
 
 /* Where a surah begins, its name is the event on the page: set larger than
    the head that merely labels one, sized from its own line. */
 .m-line.m-surah .ph-surah {
+  flex: 0 0 auto;
   line-height: 1;
   font-size: calc(var(--m-line-h) * 0.95);
-  color: var(--ink);
+  color: var(--mushaf-ink);
 }
 
 /* The basmalah band: one calligraphic line in its own face, centred. */
 .m-basmalah-run {
   font-family: "QCF-BSML", serif;
-  color: color-mix(in srgb, var(--accent) 85%, var(--ink));
+  color: var(--mushaf-ink);
   line-height: 1;
   white-space: pre;
   cursor: default;
-}
-
-[data-theme="night"] .m-basmalah-run {
-  color: var(--accent);
 }
 
 /* --- folio ---------------------------------------------------------------- */
@@ -230,8 +270,4 @@
    been settled: unshaped glyph codes would measure and paint wrong. */
 .mushaf:not(:empty):not(.ready) {
   visibility: hidden;
-}
-
-.mushaf:empty {
-  min-height: calc(var(--m-lines, 15) * var(--m-line-h));
 }

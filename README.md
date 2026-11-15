@@ -2,7 +2,8 @@
 
 Offline-first Madani Mushaf reader with QCF v1 page-font rendering, verse
 selection, search, surah/juz/page navigation, a virtualized ayah list, and
-local bookmarks. Translation overlays and audio are not included in v1.
+local bookmarks. The Mushaf view shows one page at a time with swipe-to-turn
+navigation. Translation overlays and audio are not included in v1.
 
 ## Development
 

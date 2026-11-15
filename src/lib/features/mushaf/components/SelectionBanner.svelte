@@ -22,6 +22,11 @@ let copied = $state<string | null>(null)
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
 const count = $derived(selection.size)
+const selectionLabel = $derived.by(() => {
+  if (selection.mode === "word") return `${count} ${count === 1 ? "word" : "words"} selected`
+  const keys = selection.keys()
+  return keys.length === 1 ? `${keys[0]} selected` : `${keys.length} verses selected`
+})
 
 function flash(message: string): void {
   copied = message
@@ -107,9 +112,9 @@ function bookmarkSelected(): void {
     role="status"
   >
     <span class="text-sm whitespace-nowrap text-ink">
-      {count}
-      {count === 1 ? "verse" : "verses"} selected
+      {selectionLabel}
     </span>
+    {#if selection.mode === "ayah"}
     <button
       class="rounded-full bg-accent px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90 active:scale-95"
       onclick={copySelected}
@@ -122,6 +127,7 @@ function bookmarkSelected(): void {
     >
       Bookmark
     </button>
+    {/if}
     <button
       class="rounded-full px-3 py-1.5 text-sm text-ink-muted transition hover:bg-accent-soft hover:text-ink active:scale-95"
       onclick={clearSelection}
