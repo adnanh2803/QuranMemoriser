@@ -13,7 +13,12 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
   import type { MushafWord, PageChunk } from "../../../domain/schemas"
   import type { PageFontRegistry } from "../data/page-fonts"
   import type { WordIdentity } from "../data/mushaf-repository"
-  import type { RunCandidate, SelectionEngine, WordRef } from "../model/selection.svelte"
+  import {
+    compareWordRefs,
+    type RunCandidate,
+    type SelectionEngine,
+    type WordRef,
+  } from "../model/selection.svelte"
   import type { WordLedger } from "../model/word-ledger"
   import { settleLines } from "../model/settle"
   import { SURAH_WORD, surahNameGlyph } from "../model/surah-names"
@@ -158,14 +163,17 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
         const firstRect = start.getBoundingClientRect()
         const lastRect = finish.getBoundingClientRect()
         start.style.setProperty("--m-selection-run-width", `${Math.max(firstRect.right - lastRect.left, firstRect.width)}px`)
-        // The bar's end cushion: full at a mid-line stop, square when the run
-        // bridges out to the line's end edge (the page's last slot).
-        const bridges = finish.classList.contains("m-selected-page-edge-end")
+        // The bar's end: square and reaching to the line's end edge only when
+        // the stroke carries on past this page; otherwise a rounded pill end
+        // with its cushion.
+        const bridges =
+          finish.classList.contains("m-selected-page-edge-end") && isStrokeContinuedAfter(refOf(finish))
         start.style.setProperty(
           "--m-selection-run-to-line-end",
           bridges ? finish.style.getPropertyValue("--m-select-to-line-end") : "0px",
         )
         start.style.setProperty("--m-selection-run-end-pad", bridges ? "0px" : "var(--m-wash-pad-x)")
+        start.style.setProperty("--m-stroke-end-radius", bridges ? "0px" : "")
       }
     }
   }
@@ -286,6 +294,25 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
     const lastLine = [...(chunk?.lines ?? [])].reverse().find((line) => line.kind === "words")
     return lastLine?.kind === "words" && lastLine.words.at(-1) === word
   }
+  /** The stroke reaches back past this page: the run began on an earlier
+   * one, so the page's first bar lands square on the line's start edge. A
+   * selection that merely begins at the page's first word stays a pill. */
+  const isStrokeContinuedBefore = (ref: WordRef | null): boolean => {
+    const run = selection.run
+    return ref !== null && run !== null && compareWordRefs(run.start, ref) < 0
+  }
+  /** The stroke runs on past this page: the run ends on a later one, so the
+   * page's last bar reaches square to the line's end edge. */
+  const isStrokeContinuedAfter = (ref: WordRef | null): boolean => {
+    const run = selection.run
+    return ref !== null && run !== null && compareWordRefs(ref, run.end) < 0
+  }
+  /** A word's ref from its painted element, for the geometry passes. */
+  const refOf = (el: HTMLElement): WordRef | null => {
+    const g = el.dataset.g
+    if (g === undefined) return null
+    return wordRef({ g, s: Number(el.dataset.s), a: Number(el.dataset.a) })
+  }
 </script>
 
 <section
@@ -346,7 +373,7 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
                 class:m-selected-start={isSelectedStart(line.words, index)}
                 class:m-selected-end={isSelectedEnd(line.words, index)}
                 class:m-selected-run-start={isSelectedStart(line.words, index)}
-                class:m-selected-page-edge-start={isSelected(word) && isPageFirstWord(word)}
+                class:m-selected-page-edge-start={isSelected(word) && isPageFirstWord(word) && isStrokeContinuedBefore(wordRef(word))}
                 class:m-selected-page-edge-end={isSelected(word) && isPageLastWord(word)}
                 data-s={word.s}
                 data-a={word.a}

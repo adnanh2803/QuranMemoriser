@@ -40,7 +40,7 @@
   --m-line-h: calc(var(--m-line-ratio) * 1em);
   /* The selection wash's horizontal cushion: how far the highlighter bar
      leans past the run's first and last words. */
-  --m-wash-pad-x: 0.18em;
+  --m-wash-pad-x: 0.28em;
   --sheet-pad-x: clamp(14px, calc(14px + (100vw - 640px) * 0.025), 30px);
   --sheet-pad-t: 12px;
   --sheet-pad-b: 10px;
@@ -169,7 +169,7 @@
 .m-word.m-selected-run-start::before {
   position: absolute;
   z-index: -1;
-  inset-block: 0.3em;
+  inset-block: 0.1em;
   inset-inline-start: calc(-1 * var(--m-wash-pad-x));
   width: calc(
     var(--m-selection-run-width, 100%) +
@@ -177,7 +177,11 @@
     var(--m-wash-pad-x) +
     var(--m-selection-run-end-pad, var(--m-wash-pad-x))
   );
-  border-radius: 0.26em;
+  border-radius: 0.32em;
+  /* The bar's far end squares off only when the stroke bridges past the
+     page; the geometry pass drives the var. */
+  border-start-end-radius: var(--m-stroke-end-radius, 0.32em);
+  border-end-end-radius: var(--m-stroke-end-radius, 0.32em);
   border: 0;
   background: var(--selection);
   content: "";
@@ -194,9 +198,9 @@
 .m-word.m-pending::after {
   content: "";
   position: absolute;
-  inset-block: 0.24em;
-  inset-inline: -0.22em;
-  border-radius: 0.26em;
+  inset-block: 0.18em;
+  inset-inline: -0.26em;
+  border-radius: 0.32em;
   box-shadow:
     0 0 0 0.05em color-mix(in srgb, var(--accent) 88%, transparent),
     0 0 0.38em color-mix(in srgb, var(--accent) 42%, transparent);
@@ -230,9 +234,10 @@
   }
 }
 
-/* A selection that begins or ends on the page's edge keeps its bar square
-   against the line's margin, so runs that wrap across the page break read
-   as one stroke. */
+/* A stroke that wraps onto this page from the previous one keeps its bar
+   square against the line's margin, so the two pages read as one stroke.
+   The class only lands when the run genuinely began on an earlier page —
+   a selection that starts at the page's first word stays a rounded pill. */
 .m-word.m-selected-page-edge-start::before {
   inset-inline-start: calc(0px - var(--m-select-to-line-start, 0px));
   width: calc(

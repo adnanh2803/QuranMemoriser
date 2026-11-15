@@ -116,15 +116,19 @@ test("marks a start, completes the range on the second tap", async ({ page }) =>
         wordHeight,
         startOffset: Number.parseFloat(style.right),
         width: Number.parseFloat(style.width),
+        startCorner: style.getPropertyValue("border-start-start-radius"),
       }
     })
   expect(wash.painted).toBe(true)
   expect(wash.runWidth).toBeGreaterThan(0)
   expect(wash.top).toBeGreaterThan(0)
   expect(wash.top).toBe(wash.bottom)
-  expect(wash.barHeight).toBeLessThan(wash.wordHeight * 0.75)
+  expect(wash.barHeight).toBeLessThan(wash.wordHeight)
   expect(wash.startOffset).toBeLessThan(0)
   expect(wash.width).toBeGreaterThan(wash.runWidth)
+  // 1:1 begins on the page's first word, so the bar must keep the pill's
+  // rounded start corners rather than squaring off at the line's margin.
+  expect(wash.startCorner).not.toBe("0px")
 
   // The highlight must bridge the justified gaps between a verse's words.
   const remainingHighlightGap = await page
