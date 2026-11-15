@@ -11,7 +11,6 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
 -->
 <script lang="ts">
   import type { MushafWord, PageChunk } from "../../../domain/schemas"
-  import { verseKey } from "../../../domain/schemas"
   import type { PageFontRegistry } from "../data/page-fonts"
   import type { WordIdentity } from "../data/mushaf-repository"
   import type { RunCandidate, SelectionEngine, WordRef } from "../model/selection.svelte"
@@ -159,12 +158,14 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
         const firstRect = start.getBoundingClientRect()
         const lastRect = finish.getBoundingClientRect()
         start.style.setProperty("--m-selection-run-width", `${Math.max(firstRect.right - lastRect.left, firstRect.width)}px`)
+        // The bar's end cushion: full at a mid-line stop, square when the run
+        // bridges out to the line's end edge (the page's last slot).
+        const bridges = finish.classList.contains("m-selected-page-edge-end")
         start.style.setProperty(
           "--m-selection-run-to-line-end",
-          finish.classList.contains("m-selected-page-edge-end")
-            ? finish.style.getPropertyValue("--m-select-to-line-end")
-            : "0px",
+          bridges ? finish.style.getPropertyValue("--m-select-to-line-end") : "0px",
         )
+        start.style.setProperty("--m-selection-run-end-pad", bridges ? "0px" : "var(--m-wash-pad-x)")
       }
     }
   }
@@ -277,20 +278,6 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
     const next = words[index + 1]
     return index === words.length - 1 || !next || !isSelected(next)
   }
-  const continuesFromPreviousLine = (lineIndex: number, words: MushafWord[]): boolean => {
-    const first = words[0]
-    const previousLine = chunk?.lines[lineIndex - 1]
-    if (!first || previousLine?.kind !== "words") return false
-    const previous = previousLine.words.at(-1)
-    return !!previous && verseKey(first.s, first.a) === verseKey(previous.s, previous.a) && isSelected(first)
-  }
-  const continuesToNextLine = (lineIndex: number, words: MushafWord[]): boolean => {
-    const last = words.at(-1)
-    const nextLine = chunk?.lines[lineIndex + 1]
-    if (!last || nextLine?.kind !== "words") return false
-    const next = nextLine.words[0]
-    return !!next && verseKey(last.s, last.a) === verseKey(next.s, next.a) && isSelected(last)
-  }
   const isPageFirstWord = (word: MushafWord): boolean => {
     const firstLine = chunk?.lines.find((line) => line.kind === "words")
     return firstLine?.kind === "words" && firstLine.words[0] === word
@@ -359,8 +346,6 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
                 class:m-selected-start={isSelectedStart(line.words, index)}
                 class:m-selected-end={isSelectedEnd(line.words, index)}
                 class:m-selected-run-start={isSelectedStart(line.words, index)}
-                class:m-selected-continuation-start={index === 0 && continuesFromPreviousLine(lineIndex, line.words)}
-                class:m-selected-continuation-end={index === line.words.length - 1 && continuesToNextLine(lineIndex, line.words)}
                 class:m-selected-page-edge-start={isSelected(word) && isPageFirstWord(word)}
                 class:m-selected-page-edge-end={isSelected(word) && isPageLastWord(word)}
                 data-s={word.s}

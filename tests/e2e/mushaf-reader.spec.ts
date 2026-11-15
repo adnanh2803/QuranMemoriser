@@ -96,21 +96,35 @@ test("marks a start, completes the range on the second tap", async ({ page }) =>
   await expect(page.getByRole("status")).toContainText("1:1 selected")
   await expect(page.locator(".m-word.m-selected")).toHaveCount(5)
 
-  // The selected run paints one wash on the run-start word's ::before.
+  // The selected run paints one highlighter bar on the run-start word's
+  // ::before: inset from the line's height, centred on the ink, with a
+  // cushion leaning past the run's start.
   const wash = await page
     .locator(".m-word.m-selected-run-start")
     .first()
     .evaluate((word) => {
       const style = getComputedStyle(word, "::before")
+      const wordHeight = word.getBoundingClientRect().height
+      const top = Number.parseFloat(style.top)
+      const bottom = Number.parseFloat(style.bottom)
       return {
         painted: style.backgroundColor !== "rgba(0, 0, 0, 0)",
         runWidth: Number.parseFloat(word.style.getPropertyValue("--m-selection-run-width")),
-        insets: { top: style.top, bottom: style.bottom },
+        top,
+        bottom,
+        barHeight: wordHeight - top - bottom,
+        wordHeight,
+        startOffset: Number.parseFloat(style.right),
+        width: Number.parseFloat(style.width),
       }
     })
   expect(wash.painted).toBe(true)
   expect(wash.runWidth).toBeGreaterThan(0)
-  expect(wash.insets).toEqual({ top: "0px", bottom: "0px" })
+  expect(wash.top).toBeGreaterThan(0)
+  expect(wash.top).toBe(wash.bottom)
+  expect(wash.barHeight).toBeLessThan(wash.wordHeight * 0.75)
+  expect(wash.startOffset).toBeLessThan(0)
+  expect(wash.width).toBeGreaterThan(wash.runWidth)
 
   // The highlight must bridge the justified gaps between a verse's words.
   const remainingHighlightGap = await page
