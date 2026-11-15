@@ -27,12 +27,35 @@ export interface CommandContext {
   keysBetween(fromIndex: number, toIndex: number): VerseKey[]
 }
 
+/** The Uthmani dagger alif and its tatweel ligature. */
+const DAGGER_ALIF = /\u0670/g
+const TATWEEL = /\u0640/g
+
+/**
+ * Common-spelling form: the dagger alif is dropped, so مَٰلِكِ reads ملك and
+ * الرَّحْمَٰنِ reads الرحمن — how a user types the words from memory. The
+ * normalizer alone expands the dagger instead (مالك, الرحمان), which matches
+ * a query pasted from the Uthmani script but not a recalled spelling.
+ */
+function commonSpelling(text: string): string {
+  return normalize(text.replace(TATWEEL, "").replace(DAGGER_ALIF, ""), { stripHamza: true })
+}
+
+/** One ayah's searchable forms, built once for the whole index. */
+interface SearchEntry {
+  ayah: AyahMeta
+  /** Normalized with the dagger expanded (matches pasted Uthmani). */
+  uthmani: string
+  /** Normalized with the dagger dropped (matches recalled spelling). */
+  common: string
+}
+
 export class MushafRepository {
   private readonly chunkPromises = new Map<number, Promise<PageChunk>>()
   private surahsPromise: Promise<SurahSummary[]> | null = null
   private ayahsPromise: Promise<AyahMeta[]> | null = null
   private metaPromise: Promise<MushafMeta> | null = null
-  private searchIndexPromise: Promise<Array<{ ayah: AyahMeta; text: string }>> | null = null
+  private searchIndexPromise: Promise<SearchEntry[]> | null = null
 
   /** The layout chunk of one page, fetched once and cached. */
   pageChunk(page: number): Promise<PageChunk> {
@@ -76,15 +99,20 @@ export class MushafRepository {
 
   /** Search ayahs locally after normalizing Arabic diacritics and spelling. */
   async search(query: string, limit = 20): Promise<AyahMeta[]> {
-    const needle = normalize(query, { stripHamza: true }).trim()
-    if (!needle) return []
+    const bare = normalize(query, { stripHamza: true }).trim()
+    if (!bare) return []
+    const recalled = commonSpelling(query).trim()
     this.searchIndexPromise ??= this.ayahs().then((ayahs) =>
-      ayahs.map((ayah) => ({ ayah, text: normalize(ayah.text, { stripHamza: true }) })),
+      ayahs.map((ayah) => ({
+        ayah,
+        uthmani: normalize(ayah.text, { stripHamza: true }),
+        common: commonSpelling(ayah.text),
+      })),
     )
     const index = await this.searchIndexPromise
     const matches: AyahMeta[] = []
     for (const entry of index) {
-      if (entry.text.includes(needle)) {
+      if (entry.uthmani.includes(bare) || entry.common.includes(recalled)) {
         matches.push(entry.ayah)
         if (matches.length >= limit) break
       }

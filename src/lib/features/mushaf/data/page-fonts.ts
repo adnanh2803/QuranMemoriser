@@ -111,6 +111,9 @@ export class PageFontRegistry {
 export function registerStaticFonts(): void {
   document.fonts.add(new FontFace("QCF-BSML", "url(/fonts/QCF_BSML.woff2)"))
   document.fonts.add(new FontFace("SuraNames", "url(/fonts/sura-names.woff2)"))
+  // The continuous Uthmanic Hafs face behind the ayah list and search results.
+  document.fonts.add(new FontFace("UthmanicHafs", "url(/fonts/uthmanic-hafs.woff2)"))
   void document.fonts.load('1em "QCF-BSML"').catch(() => {})
   void document.fonts.load('1em "SuraNames"').catch(() => {})
+  void document.fonts.load('1em "UthmanicHafs"').catch(() => {})
 }
