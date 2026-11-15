@@ -58,15 +58,31 @@ test("keeps the same sheet dimensions on short and full pages", async ({ page })
   expect(fullPage.height).toBeCloseTo(shortPage.height, 1)
 })
 
-test("selects through a word, a whole ayah by its number, a row by its edge", async ({ page }) => {
+test("marks a start, completes the range on the second tap", async ({ page }) => {
   await page.goto("/", { waitUntil: "domcontentloaded" })
 
-  // Tapping a word selects the verse from its first word through that word.
+  // The first tap marks the start: it alone lights up and the banner waits.
   await page.locator('.m-word[data-s="1"][data-a="1"]').nth(1).click()
-  await expect(page.getByRole("status")).toContainText("2 words selected")
-  await expect(page.locator(".m-word.m-selected")).toHaveCount(2)
+  await expect(page.getByRole("status")).toContainText("tap the end")
+  await expect(page.locator(".m-word.m-selected")).toHaveCount(1)
 
-  // Tapping the ayah number — the verse-end medallion — selects the whole verse.
+  // The second tap ends the selection: everything between, in either order.
+  await page.locator('.m-word[data-s="1"][data-a="1"]').nth(3).click()
+  await expect(page.getByRole("status")).toContainText("3 words selected")
+  await expect(page.locator(".m-word.m-selected")).toHaveCount(3)
+
+  // Tapping the marked word again completes a one-word selection.
+  await page.getByRole("button", { name: "Clear" }).click()
+  await expect(page.getByRole("status")).toHaveCount(0)
+  const secondWord = page.locator('.m-word[data-s="1"][data-a="2"]').first()
+  await secondWord.click()
+  await secondWord.click()
+  await expect(page.getByRole("status")).toContainText("1 word selected")
+  await expect(page.locator(".m-word.m-selected")).toHaveCount(1)
+
+  // The ayah number — the verse-end medallion — still selects the whole
+  // verse in one tap, and completes a range as the second tap.
+  await page.getByRole("button", { name: "Clear" }).click()
   await page.locator('.m-word[data-s="1"][data-a="1"].m-end').click()
   await expect(page.getByRole("status")).toContainText("1:1 selected")
   await expect(page.locator(".m-word.m-selected")).toHaveCount(5)
@@ -113,14 +129,17 @@ test("selects through a word, a whole ayah by its number, a row by its edge", as
 
   // Tapping a row's side selects the whole printed row: here 1:5 in full and
   // 1:6's first word — six slots across two verses.
+  await page.getByRole("button", { name: "Clear" }).click()
   await page.locator(".m-line.m-ayah").nth(3).locator(".m-edge-end").click()
   await expect(page.getByRole("status")).toContainText("6 words selected")
   await expect(page.locator(".m-word.m-selected")).toHaveCount(6)
 
-  // A long press extends the run through the word (the touch shift-tap).
+  // A long press extends the marked start through the word (the touch shift).
   await page.getByRole("button", { name: "Clear" }).click()
   await expect(page.getByRole("status")).toHaveCount(0)
   const firstOfFifth = page.locator('.m-word[data-s="1"][data-a="5"]').first()
+  await firstOfFifth.click()
+  await expect(page.getByRole("status")).toContainText("tap the end")
   await firstOfFifth.dispatchEvent("pointerdown", {
     pointerId: 1,
     isPrimary: true,
@@ -138,7 +157,8 @@ test("selects through a word, a whole ayah by its number, a row by its edge", as
   })
   await expect(page.getByRole("status")).toContainText("1 word selected")
   await expect(page.locator(".m-word.m-selected")).toHaveCount(1)
-  await page.locator('.m-word[data-s="1"][data-a="5"]').nth(1).dispatchEvent("pointerdown", {
+  const secondOfFifth = page.locator('.m-word[data-s="1"][data-a="5"]').nth(1)
+  await secondOfFifth.dispatchEvent("pointerdown", {
     pointerId: 1,
     isPrimary: true,
     pointerType: "touch",
@@ -146,7 +166,7 @@ test("selects through a word, a whole ayah by its number, a row by its edge", as
     clientY: 120,
   })
   await page.waitForTimeout(550)
-  await page.locator('.m-word[data-s="1"][data-a="5"]').nth(1).dispatchEvent("pointerup", {
+  await secondOfFifth.dispatchEvent("pointerup", {
     pointerId: 1,
     isPrimary: true,
     pointerType: "touch",
@@ -154,12 +174,14 @@ test("selects through a word, a whole ayah by its number, a row by its edge", as
     clientY: 120,
   })
   await expect(page.getByRole("status")).toContainText("2 words selected")
+  await expect(page.locator(".m-word.m-selected")).toHaveCount(2)
 
-  // Shift-click extends the run to the whole verse clicked through its number.
+  // Shift-click extends the marked start to the whole verse clicked through
+  // its number.
   await page.getByRole("button", { name: "Clear" }).click()
   await expect(page.getByRole("status")).toHaveCount(0)
   await page.locator('.m-word[data-s="1"][data-a="2"]').first().click()
-  await expect(page.getByRole("status")).toContainText("1 word selected")
+  await expect(page.getByRole("status")).toContainText("tap the end")
   await page.keyboard.down("Shift")
   await page.locator('.m-word[data-s="1"][data-a="4"].m-end').click()
   await page.keyboard.up("Shift")

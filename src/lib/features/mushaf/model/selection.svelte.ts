@@ -1,12 +1,15 @@
 /**
- * Selection of a contiguous run of printed slots on the mushaf.
+ * Selection of a contiguous run of printed slots on the mushaf, marked in
+ * two taps.
  *
- * Every gesture picks a run: tapping a word selects its verse from the first
- * word through the tapped word; tapping the verse-end medallion (the ayah
- * number) selects the whole verse; tapping a printed row's edge or the gap
- * between two of its words selects the row. A fresh tap replaces the run and
- * tapping inside it clears; shift-tap or a long press extends the run to
- * cover the tapped target instead.
+ * Tapping a word marks the selection's start: it alone lights up, softly,
+ * and waits. The next tap — a word, a verse-end medallion, or a printed
+ * row's edge — ends the selection, which then spans everything between the
+ * two taps in either direction; tapping the marked word again completes a
+ * one-word selection. A verse or a row tapped with no start marked selects
+ * its whole unit at once, and can still serve as the end tap afterwards.
+ * Tapping inside a finished selection dismisses it; shift-tap, Ctrl-click
+ * or a long press extends instead.
  *
  * The state lives in one small engine; every user action is a command object
  * executed against it with the command context, so the interactions stay
@@ -38,6 +41,16 @@ export type RunCandidate =
   | { kind: "verse"; key: VerseKey }
   | { kind: "row"; first: WordIdentity; last: WordIdentity }
 
+/** What one gesture resolves to: the slot it aims at and the unit it covers. */
+export interface GestureTarget {
+  /** What the gesture means: a single word, a whole verse, or a whole row. */
+  unit: "word" | "verse" | "row"
+  /** The tapped slot (the word, or the verse's end medallion). */
+  point: WordRef
+  /** The whole printed unit: the word alone, the whole verse, the whole row. */
+  span: SelectionRun
+}
+
 /** Mushaf order of two slots: surah, then ayah, then printed position. */
 export function compareWordRefs(a: WordRef, b: WordRef): number {
   if (a.surah !== b.surah) return a.surah - b.surah
@@ -55,31 +68,42 @@ function wordRefOf(word: WordIdentity, context: CommandContext): WordRef | null 
   return { surah: word.surah, ayah: word.ayah, word: index }
 }
 
-/** Turn a candidate into a concrete run, or null when it cannot resolve. */
-export function resolveCandidate(
+/** Turn a candidate into the gesture's point and span, or null when unknown. */
+export function resolveTarget(
   candidate: RunCandidate,
   context: CommandContext,
-): SelectionRun | null {
+): GestureTarget | null {
   switch (candidate.kind) {
     case "word": {
-      // A word selects its verse from the first word through itself; the
-      // verse-end medallion is the last slot, so it selects the whole verse.
       const ref = wordRefOf(candidate.word, context)
       if (!ref) return null
-      return { start: { ...ref, word: 1 }, end: ref }
+      const total = context.verseWordCount(verseKey(ref.surah, ref.ayah))
+      // The verse-end medallion — the ayah number — means the whole verse,
+      // in every phase of the two-tap flow.
+      if (total !== undefined && ref.word === total) {
+        return {
+          unit: "verse",
+          point: ref,
+          span: { start: { surah: ref.surah, ayah: ref.ayah, word: 1 }, end: ref },
+        }
+      }
+      return { unit: "word", point: ref, span: { start: ref, end: ref } }
     }
     case "verse": {
       const parsed = parseVerseKey(candidate.key)
       const total = context.verseWordCount(candidate.key)
       if (!parsed || total === undefined) return null
       const [surah, ayah] = parsed
-      return { start: { surah, ayah, word: 1 }, end: { surah, ayah, word: total } }
+      const start = { surah, ayah, word: 1 }
+      const end = { surah, ayah, word: total }
+      return { unit: "verse", point: end, span: { start, end } }
     }
     case "row": {
       const first = wordRefOf(candidate.first, context)
       const last = wordRefOf(candidate.last, context)
       if (!first || !last) return null
-      return { start: minWordRef(first, last), end: maxWordRef(first, last) }
+      const span = { start: minWordRef(first, last), end: maxWordRef(first, last) }
+      return { unit: "row", point: span.end, span }
     }
   }
 }
@@ -110,7 +134,7 @@ function isWholeVerseRun(run: SelectionRun, context: CommandContext): boolean {
 }
 
 /** Assign a resolved run and its derived counts to the engine. */
-function applyRun(run: SelectionRun, engine: SelectionEngine, context: CommandContext): void {
+function applyRunSpan(run: SelectionRun, engine: SelectionEngine, context: CommandContext): void {
   engine.setRun(
     run,
     countRunWords(run, context),
@@ -122,12 +146,25 @@ function applyRun(run: SelectionRun, engine: SelectionEngine, context: CommandCo
 /** The selection state. Reactive: reading it in a component tracks changes. */
 export class SelectionEngine {
   private runState = $state<SelectionRun | null>(null)
+  private pendingState = $state<WordRef | null>(null)
   private wordCountState = $state(0)
   private touchedState = $state<VerseKey[]>([])
   private wholeState = $state(false)
 
   /** The selected run, or null when nothing is selected. */
   get run(): SelectionRun | null {
+    return this.runState
+  }
+
+  /** The start a tap has marked, waiting for the end tap. */
+  get pending(): WordRef | null {
+    return this.pendingState
+  }
+
+  /** What the sheet highlights: the marked start alone, or the selection. */
+  get displayRun(): SelectionRun | null {
+    const pending = this.pendingState
+    if (pending) return { start: pending, end: pending }
     return this.runState
   }
 
@@ -147,13 +184,15 @@ export class SelectionEngine {
   }
 
   isWordSelected(ref: WordRef): boolean {
-    const run = this.runState
+    const run = this.displayRun
     if (!run) return false
     return compareWordRefs(ref, run.start) >= 0 && compareWordRefs(ref, run.end) <= 0
   }
 
-  /** Whether the run touches this verse, even partially. */
+  /** Whether the selection touches this verse, even partially. */
   has(key: VerseKey): boolean {
+    const pending = this.pendingState
+    if (pending && verseKey(pending.surah, pending.ayah) === key) return true
     return this.touchedState.includes(key)
   }
 
@@ -162,7 +201,17 @@ export class SelectionEngine {
     return [...this.touchedState]
   }
 
+  /** Mark a word as the selection's start; it replaces any selection. */
+  setPending(ref: WordRef): void {
+    this.pendingState = ref
+    this.runState = null
+    this.wordCountState = 0
+    this.touchedState = []
+    this.wholeState = false
+  }
+
   setRun(run: SelectionRun, words: number, touched: VerseKey[], whole: boolean): void {
+    this.pendingState = null
     this.runState = run
     this.wordCountState = words
     this.touchedState = touched
@@ -170,6 +219,7 @@ export class SelectionEngine {
   }
 
   clear(): void {
+    this.pendingState = null
     this.runState = null
     this.wordCountState = 0
     this.touchedState = []
@@ -183,26 +233,49 @@ export interface SelectionCommand {
   execute(engine: SelectionEngine, context: CommandContext): void
 }
 
-/** Tap a printed target: select its run, or clear when it is already inside. */
+/** Tap a printed target: mark a start, complete a selection, or dismiss. */
 export class TapRun implements SelectionCommand {
   readonly name = "tap-run"
 
   constructor(private readonly candidate: RunCandidate) {}
 
   execute(engine: SelectionEngine, context: CommandContext): void {
-    const run = resolveCandidate(this.candidate, context)
-    if (!run) return
-    if (engine.isWordSelected(run.start) && engine.isWordSelected(run.end)) {
+    const target = resolveTarget(this.candidate, context)
+    if (!target) return
+    const pending = engine.pending
+    if (pending) {
+      // The second tap ends the selection: it spans from the marked start
+      // to everything this gesture covers, in either direction.
+      applyRunSpan(
+        {
+          start: minWordRef(pending, target.span.start),
+          end: maxWordRef(pending, target.span.end),
+        },
+        engine,
+        context,
+      )
+      return
+    }
+    const run = engine.run
+    if (run && engine.isWordSelected(target.span.start) && engine.isWordSelected(target.span.end)) {
+      // Tapping inside the selection dismisses it.
       engine.clear()
       return
     }
-    applyRun(run, engine, context)
+    // A word marks the start and waits for the end; a verse or a row
+    // selects its whole unit at once.
+    if (target.unit === "word") {
+      engine.setPending(target.point)
+      return
+    }
+    applyRunSpan(target.span, engine, context)
   }
 }
 
 /**
- * Shift-tap or long-press a printed target: extend the run to cover it. Acts
- * like a tap when nothing is selected yet.
+ * Shift-tap, Ctrl-click or a long press: extend the selection to cover the
+ * target instead of marking a start. Acts like the plain gesture when
+ * nothing is marked or selected yet.
  */
 export class ExtendRun implements SelectionCommand {
   readonly name = "extend-run"
@@ -210,17 +283,21 @@ export class ExtendRun implements SelectionCommand {
   constructor(private readonly candidate: RunCandidate) {}
 
   execute(engine: SelectionEngine, context: CommandContext): void {
-    const candidate = resolveCandidate(this.candidate, context)
-    if (!candidate) return
-    const current = engine.run
+    const target = resolveTarget(this.candidate, context)
+    if (!target) return
+    const current = engine.displayRun
     if (!current) {
-      applyRun(candidate, engine, context)
+      if (target.unit === "word") {
+        engine.setPending(target.point)
+        return
+      }
+      applyRunSpan(target.span, engine, context)
       return
     }
-    applyRun(
+    applyRunSpan(
       {
-        start: minWordRef(current.start, candidate.start),
-        end: maxWordRef(current.end, candidate.end),
+        start: minWordRef(current.start, target.span.start),
+        end: maxWordRef(current.end, target.span.end),
       },
       engine,
       context,
@@ -228,7 +305,7 @@ export class ExtendRun implements SelectionCommand {
   }
 }
 
-/** Empty the selection. */
+/** Empty the selection (a marked start included). */
 export class ClearSelection implements SelectionCommand {
   readonly name = "clear-selection"
 

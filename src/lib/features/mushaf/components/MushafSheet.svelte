@@ -186,6 +186,7 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
   $effect(() => {
     void selection.run
     void selection.size
+    void selection.pending
     const el = box
     if (!el || !fontReady) return
     requestAnimationFrame(() => updateSelectionRunWidths(el))
@@ -259,6 +260,18 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
   const isSelected = (word: MushafWord): boolean => {
     const ref = wordRef(word)
     return ref !== null && selection.isWordSelected(ref)
+  }
+  /** The word a tap has marked as the selection's start, waiting for the end. */
+  const isPending = (word: MushafWord): boolean => {
+    const ref = wordRef(word)
+    const pending = selection.pending
+    return (
+      ref !== null &&
+      pending !== null &&
+      ref.surah === pending.surah &&
+      ref.ayah === pending.ayah &&
+      ref.word === pending.word
+    )
   }
   const isSelectedStart = (words: MushafWord[], index: number): boolean => {
     const word = words[index]
@@ -354,6 +367,7 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
                 class="m-word"
                 class:m-end={isEnd(word)}
                 class:m-selected={isSelected(word)}
+                class:m-pending={isPending(word)}
                 class:m-selected-start={isSelectedStart(line.words, index)}
                 class:m-selected-end={isSelectedEnd(line.words, index)}
                 class:m-selected-run-start={isSelectedStart(line.words, index)}

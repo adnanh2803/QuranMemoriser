@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+
 import type {
   CommandContext,
   WordIdentity,
@@ -50,14 +51,8 @@ const SLOT_INDEX: Record<string, number> = {
   "1:D2": 2,
   "1:D3": 3,
   "1:D4": 4,
-  "2:E1": 1,
-  "2:E9": 9,
-  "2:F1": 1,
-  "2:F5": 5,
   "2:G1": 1,
-  "2:H1": 1,
-  "2:H6": 6,
-  "3:I1": 1,
+  "2:G4": 4,
 }
 
 const context: CommandContext = {
@@ -104,41 +99,102 @@ describe("SelectionEngine", () => {
     const engine = new SelectionEngine()
     expect(engine.size).toBe(0)
     expect(engine.run).toBeNull()
+    expect(engine.pending).toBeNull()
     expect(engine.verseCount).toBe(0)
   })
 })
 
 describe("TapRun", () => {
-  it("selects a verse from its first word through the tapped word", () => {
+  it("marks a tapped word as the selection's start", () => {
     const engine = new SelectionEngine()
     run(engine, new TapRun(slot(1, 1, 1, "A2")))
-    expect(engine.run).toEqual({
-      start: { surah: 1, ayah: 1, word: 1 },
-      end: { surah: 1, ayah: 1, word: 2 },
-    })
-    expect(engine.size).toBe(2)
-    expect(engine.wholeVerses).toBe(false)
-    expect(engine.verseKeys()).toEqual(["1:1"])
+    expect(engine.pending).toEqual({ surah: 1, ayah: 1, word: 2 })
+    expect(engine.run).toBeNull()
+    // The marked word alone reads as selected while it waits.
+    expect(engine.isWordSelected({ surah: 1, ayah: 1, word: 2 })).toBe(true)
+    expect(engine.isWordSelected({ surah: 1, ayah: 1, word: 3 })).toBe(false)
   })
 
-  it("selects the whole verse through its end medallion", () => {
+  it("completes the range on the second tap, in either order", () => {
     const engine = new SelectionEngine()
-    run(engine, new TapRun(slot(1, 1, 1, "A5")))
-    expect(engine.size).toBe(5)
+    run(engine, new TapRun(slot(1, 1, 1, "A2")))
+    run(engine, new TapRun(slot(1, 1, 1, "A4")))
+    expect(engine.pending).toBeNull()
+    expect(engine.run).toEqual({
+      start: { surah: 1, ayah: 1, word: 2 },
+      end: { surah: 1, ayah: 1, word: 4 },
+    })
+    expect(engine.size).toBe(3)
+
+    const backwards = new SelectionEngine()
+    run(backwards, new TapRun(slot(1, 1, 1, "A4")))
+    run(backwards, new TapRun(slot(1, 1, 1, "A2")))
+    expect(backwards.run).toEqual({
+      start: { surah: 1, ayah: 1, word: 2 },
+      end: { surah: 1, ayah: 1, word: 4 },
+    })
+  })
+
+  it("completes a one-word selection when the second tap hits the same slot", () => {
+    const engine = new SelectionEngine()
+    run(engine, new TapRun(slot(1, 1, 1, "A2")))
+    run(engine, new TapRun(slot(1, 1, 1, "A2")))
+    expect(engine.run).toEqual({
+      start: { surah: 1, ayah: 1, word: 2 },
+      end: { surah: 1, ayah: 1, word: 2 },
+    })
+    expect(engine.size).toBe(1)
+    expect(engine.wholeVerses).toBe(false)
+  })
+
+  it("completes through a verse's end medallion", () => {
+    const engine = new SelectionEngine()
+    run(engine, new TapRun(slot(1, 1, 1, "A2")))
+    run(engine, new TapRun({ kind: "verse", key: "1:1" }))
+    expect(engine.run).toEqual({
+      start: { surah: 1, ayah: 1, word: 1 },
+      end: { surah: 1, ayah: 1, word: 5 },
+    })
     expect(engine.wholeVerses).toBe(true)
     expect(engine.verseKeys()).toEqual(["1:1"])
   })
 
-  it("selects a whole verse from the ayah list", () => {
+  it("treats the verse-end medallion as the whole verse, as a word tap", () => {
+    const engine = new SelectionEngine()
+    // A5 is 1:1's fifth slot — its end medallion, the ayah number.
+    run(engine, new TapRun(slot(1, 1, 1, "A5")))
+    expect(engine.pending).toBeNull()
+    expect(engine.wholeVerses).toBe(true)
+    expect(engine.verseKeys()).toEqual(["1:1"])
+    expect(engine.size).toBe(5)
+  })
+
+  it("completes through a printed row", () => {
+    const engine = new SelectionEngine()
+    run(engine, new TapRun(slot(1, 3, 1, "C1")))
+    run(
+      engine,
+      new TapRun({
+        kind: "row",
+        first: { surah: 1, ayah: 3, page: 1, glyph: "C3" },
+        last: { surah: 1, ayah: 4, page: 1, glyph: "D3" },
+      }),
+    )
+    expect(engine.verseKeys()).toEqual(["1:3", "1:4"])
+    expect(engine.size).toBe(6)
+    expect(engine.wholeVerses).toBe(false)
+  })
+
+  it("selects a whole verse at once from the ayah list", () => {
     const engine = new SelectionEngine()
     run(engine, new TapRun({ kind: "verse", key: "2:1" }))
+    expect(engine.pending).toBeNull()
     expect(engine.size).toBe(5)
     expect(engine.wholeVerses).toBe(true)
     expect(engine.verseKeys()).toEqual(["2:1"])
   })
 
-  it("selects a printed row across two verses", () => {
-    // A row holding 1:3's end and 1:4's first three slots.
+  it("selects a whole row at once", () => {
     const engine = new SelectionEngine()
     run(
       engine,
@@ -150,14 +206,21 @@ describe("TapRun", () => {
     )
     expect(engine.verseKeys()).toEqual(["1:3", "1:4"])
     expect(engine.size).toBe(4)
-    expect(engine.wholeVerses).toBe(false)
   })
 
-  it("clears when the tapped target is already inside the run", () => {
+  it("dismisses the selection when tapping inside it", () => {
     const engine = new SelectionEngine()
-    run(engine, new TapRun(slot(1, 1, 1, "A3")))
-    run(engine, new TapRun(slot(1, 1, 1, "A2")))
+    run(engine, new TapRun({ kind: "verse", key: "2:1" }))
+    run(engine, new TapRun({ kind: "verse", key: "2:1" }))
     expect(engine.size).toBe(0)
+    expect(engine.run).toBeNull()
+  })
+
+  it("marks a new start when tapping a word outside the selection", () => {
+    const engine = new SelectionEngine()
+    run(engine, new TapRun({ kind: "verse", key: "2:1" }))
+    run(engine, new TapRun(slot(2, 2, 2, "G1")))
+    expect(engine.pending).toEqual({ surah: 2, ayah: 2, word: 1 })
     expect(engine.run).toBeNull()
   })
 
@@ -165,26 +228,30 @@ describe("TapRun", () => {
     const engine = new SelectionEngine()
     run(engine, new TapRun(slot(1, 1, 1, "ZZ")))
     expect(engine.size).toBe(0)
+    expect(engine.pending).toBeNull()
   })
 })
 
 describe("ExtendRun", () => {
-  it("extends the run through a later word", () => {
+  it("extends from the marked start through a later word", () => {
     const engine = new SelectionEngine()
     run(engine, new TapRun(slot(1, 1, 1, "A2")))
     run(engine, new ExtendRun(slot(1, 3, 1, "C2")))
     expect(engine.verseKeys()).toEqual(["1:1", "1:2", "1:3"])
-    expect(engine.size).toBe(12)
+    expect(engine.size).toBe(11)
     expect(engine.wholeVerses).toBe(false)
   })
 
-  it("extends backwards to a smaller word index", () => {
+  it("extends a finished selection", () => {
     const engine = new SelectionEngine()
-    run(engine, new TapRun(slot(1, 3, 1, "C1")))
-    run(engine, new ExtendRun(slot(1, 1, 1, "A3")))
-    expect(engine.verseKeys()).toEqual(["1:1", "1:2", "1:3"])
-    expect(engine.size).toBe(11)
-    expect(engine.wholeVerses).toBe(false)
+    run(engine, new TapRun({ kind: "verse", key: "2:1" }))
+    run(engine, new ExtendRun(slot(2, 2, 2, "G4")))
+    expect(engine.run).toEqual({
+      start: { surah: 2, ayah: 1, word: 1 },
+      end: { surah: 2, ayah: 2, word: 4 },
+    })
+    expect(engine.wholeVerses).toBe(true)
+    expect(engine.size).toBe(9)
   })
 
   it("extends through a row's far edge", () => {
@@ -199,20 +266,29 @@ describe("ExtendRun", () => {
       }),
     )
     expect(engine.verseKeys()).toEqual(["1:1", "1:2", "1:3", "1:4"])
-    expect(engine.wholeVerses).toBe(true)
+    expect(engine.wholeVerses).toBe(false)
   })
 
-  it("acts like a tap when nothing is selected yet", () => {
+  it("marks a start like a plain tap when nothing exists yet", () => {
     const engine = new SelectionEngine()
     run(engine, new ExtendRun(slot(1, 1, 1, "A2")))
-    expect(engine.size).toBe(2)
+    expect(engine.pending).toEqual({ surah: 1, ayah: 1, word: 2 })
+  })
+
+  it("selects a whole verse when nothing exists yet", () => {
+    const engine = new SelectionEngine()
+    run(engine, new ExtendRun({ kind: "verse", key: "2:1" }))
+    expect(engine.size).toBe(5)
+    expect(engine.wholeVerses).toBe(true)
   })
 })
 
 describe("ClearSelection", () => {
-  it("empties everything", () => {
+  it("empties everything, the marked start included", () => {
     const engine = new SelectionEngine()
     run(engine, new TapRun(slot(1, 1, 1, "A2")))
+    run(engine, new ClearSelection())
+    expect(engine.pending).toBeNull()
     run(engine, new TapRun({ kind: "verse", key: "2:1" }))
     run(engine, new ClearSelection())
     expect(engine.size).toBe(0)

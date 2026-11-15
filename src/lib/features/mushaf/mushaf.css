@@ -198,6 +198,27 @@
   pointer-events: none;
 }
 
+/* The marked start waits for the end tap: a softer, breathing wash. */
+.m-word.m-pending.m-selected-run-start::before {
+  background: color-mix(in srgb, var(--selection) 65%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .m-word.m-pending.m-selected-run-start::before {
+    animation: m-pending-pulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes m-pending-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
 /* A verse can continue onto the next printed line. Keep that line break
    square so the selected wash reads as one wrapped run. */
 .m-word.m-selected-continuation-start.m-selected-run-start::before {
