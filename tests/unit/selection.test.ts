@@ -208,6 +208,83 @@ describe("TapRun", () => {
     expect(engine.size).toBe(4)
   })
 
+  it("grows the selection when tapping another row's circle", () => {
+    const engine = new SelectionEngine()
+    run(
+      engine,
+      new TapRun({
+        kind: "row",
+        first: { surah: 1, ayah: 4, page: 1, glyph: "D1" },
+        last: { surah: 1, ayah: 4, page: 1, glyph: "D4" },
+      }),
+    )
+    run(
+      engine,
+      new TapRun({
+        kind: "row",
+        first: { surah: 1, ayah: 3, page: 1, glyph: "C3" },
+        last: { surah: 1, ayah: 4, page: 1, glyph: "D3" },
+      }),
+    )
+    expect(engine.run).toEqual({
+      start: { surah: 1, ayah: 3, word: 3 },
+      end: { surah: 1, ayah: 4, word: 4 },
+    })
+    expect(engine.size).toBe(5)
+    expect(engine.wholeVerses).toBe(false)
+  })
+
+  it("accumulates rows in either order", () => {
+    const engine = new SelectionEngine()
+    run(
+      engine,
+      new TapRun({
+        kind: "row",
+        first: { surah: 1, ayah: 3, page: 1, glyph: "C3" },
+        last: { surah: 1, ayah: 4, page: 1, glyph: "D3" },
+      }),
+    )
+    run(
+      engine,
+      new TapRun({
+        kind: "row",
+        first: { surah: 1, ayah: 4, page: 1, glyph: "D1" },
+        last: { surah: 1, ayah: 4, page: 1, glyph: "D4" },
+      }),
+    )
+    expect(engine.run).toEqual({
+      start: { surah: 1, ayah: 3, word: 3 },
+      end: { surah: 1, ayah: 4, word: 4 },
+    })
+    expect(engine.size).toBe(5)
+  })
+
+  it("accumulates whole verses into one run", () => {
+    const engine = new SelectionEngine()
+    run(engine, new TapRun({ kind: "verse", key: "2:1" }))
+    run(engine, new TapRun({ kind: "verse", key: "2:2" }))
+    expect(engine.run).toEqual({
+      start: { surah: 2, ayah: 1, word: 1 },
+      end: { surah: 2, ayah: 2, word: 4 },
+    })
+    expect(engine.wholeVerses).toBe(true)
+    expect(engine.verseKeys()).toEqual(["2:1", "2:2"])
+    expect(engine.size).toBe(9)
+  })
+
+  it("dismisses the selection when tapping a row inside it", () => {
+    const engine = new SelectionEngine()
+    const row: RunCandidate = {
+      kind: "row",
+      first: { surah: 1, ayah: 3, page: 1, glyph: "C3" },
+      last: { surah: 1, ayah: 4, page: 1, glyph: "D3" },
+    }
+    run(engine, new TapRun(row))
+    run(engine, new TapRun(row))
+    expect(engine.run).toBeNull()
+    expect(engine.size).toBe(0)
+  })
+
   it("dismisses the selection when tapping inside it", () => {
     const engine = new SelectionEngine()
     run(engine, new TapRun({ kind: "verse", key: "2:1" }))

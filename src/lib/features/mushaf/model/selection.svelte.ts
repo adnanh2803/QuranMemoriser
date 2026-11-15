@@ -7,9 +7,11 @@
  * row's edge — ends the selection, which then spans everything between the
  * two taps in either direction; tapping the marked word again completes a
  * one-word selection. A verse or a row tapped with no start marked selects
- * its whole unit at once, and can still serve as the end tap afterwards.
- * Tapping inside a finished selection dismisses it; shift-tap, Ctrl-click
- * or a long press extends instead.
+ * its whole unit at once, and can still serve as the end tap afterwards;
+ * with a selection already standing, further unit taps accumulate — each
+ * grows the run to cover its unit and everything between. Tapping inside a
+ * finished selection dismisses it; shift-tap, Ctrl-click or a long press
+ * extends instead.
  *
  * The state lives in one small engine; every user action is a command object
  * executed against it with the command context, so the interactions stay
@@ -233,7 +235,9 @@ export interface SelectionCommand {
   execute(engine: SelectionEngine, context: CommandContext): void
 }
 
-/** Tap a printed target: mark a start, complete a selection, or dismiss. */
+/** Tap a printed target: mark a start, complete a selection, or dismiss.
+ * Unit taps — a verse or a row — accumulate: each one grows the run to
+ * cover itself and everything between it and the run. */
 export class TapRun implements SelectionCommand {
   readonly name = "tap-run"
 
@@ -266,6 +270,19 @@ export class TapRun implements SelectionCommand {
     // selects its whole unit at once.
     if (target.unit === "word") {
       engine.setPending(target.point)
+      return
+    }
+    if (run) {
+      // Unit taps accumulate: another verse or row grows the run to cover
+      // both, from the earlier one's first slot to the later one's end.
+      applyRunSpan(
+        {
+          start: minWordRef(run.start, target.span.start),
+          end: maxWordRef(run.end, target.span.end),
+        },
+        engine,
+        context,
+      )
       return
     }
     applyRunSpan(target.span, engine, context)
