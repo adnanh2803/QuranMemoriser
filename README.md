@@ -43,3 +43,15 @@ npm run lint
 
 Source URLs, pins, and validation rules are maintained in
 `scripts/fetch-sources.ts` and `scripts/build-data.ts`.
+
+## Audio word-timing attribution
+
+Partial-word playback uses timing data from [quran-align](https://github.com/cpfair/quran-align),
+by Collin Fair, release `2016-11-24`, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+The bundled timings match 11 EveryAyah recordings: Alafasy, Al-Husary Murattal,
+Al-Minshawi Murattal and Mujawwad, Abdul Basit Murattal and Mujawwad, Ash-Shaatree,
+Hani Rifai, Al-Husary Muallim, Mohammad al-Tablaway, and ash-Shuraym. The pinned
+archive's As-Sudais entry is invalid, so that reciter supports ayah playback only.
+The archive also lacks usable word timings for one verse each in the Minshawi
+Mujawwad and ash-Shuraym recordings; word-range playback reports those gaps rather
+than guessing boundaries.

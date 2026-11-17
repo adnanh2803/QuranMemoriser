@@ -10,7 +10,8 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
   in, and settled against the measure before they are shown.
 -->
 <script lang="ts">
-  import type { MushafWord, PageChunk } from "../../../domain/schemas"
+  import type { MushafWord, PageChunk, VerseKey } from "../../../domain/schemas"
+import type { WordRangeBookmark } from "../data/bookmark-repository"
   import type { PageFontRegistry } from "../data/page-fonts"
   import type { WordIdentity } from "../data/mushaf-repository"
   import {
@@ -33,10 +34,13 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
     selection: SelectionEngine
     /** Slot indexes within verses, for word-granular selection. */
     ledger: WordLedger | null
+    bookmarkedKeys: VerseKey[]
+    bookmarkedWordRanges: WordRangeBookmark[]
     onSelect: (candidate: RunCandidate, extend: boolean) => void
   }
 
-  let { page, chunk, juz, fitBody, centreBelow, fonts, selection, ledger, onSelect }: Props = $props()
+  let { page, chunk, juz, fitBody, centreBelow, fonts, selection, ledger, bookmarkedKeys, bookmarkedWordRanges, onSelect }: Props = $props()
+  const bookmarkedSet = $derived(new Set(bookmarkedKeys))
 
   let box = $state<HTMLDivElement | null>(null)
   let ready = $state(false)
@@ -262,6 +266,17 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
     const ref = wordRef(word)
     return ref !== null && selection.isWordSelected(ref)
   }
+  const isBookmarked = (word: MushafWord): boolean =>
+    bookmarkedSet.has(`${word.s}:${word.a}` as VerseKey)
+  const isWordBookmarked = (word: MushafWord): boolean => {
+    const ref = wordRef(word)
+    return (
+      ref !== null &&
+      bookmarkedWordRanges.some(
+        (range) => compareWordRefs(ref, range.start) >= 0 && compareWordRefs(ref, range.end) <= 0,
+      )
+    )
+  }
   /** The word a tap has marked as the selection's start, waiting for the end. */
   const isPending = (word: MushafWord): boolean => {
     const ref = wordRef(word)
@@ -347,7 +362,7 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
     {#if chunk}
       {#each chunk.lines as line, lineIndex (line.line)}
         {#if line.kind === "surah"}
-          <div class="m-line m-surah">
+          <div class="m-line m-surah m-opening-title">
             <span class="ph-surah"
               ><span class="sw">{SURAH_WORD}</span><span class="sn"
                   >{surahNameGlyph(line.surah)}</span
@@ -355,7 +370,7 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
             >
           </div>
         {:else if line.kind === "basmalah"}
-          <div class="m-line m-basmalah">
+          <div class="m-line m-basmalah m-opening-basmalah">
             <span class="m-basmalah-run">{line.glyphs.split("|").join(" ")}</span>
           </div>
         {:else}
@@ -369,6 +384,8 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
                 class="m-word"
                 class:m-end={isEnd(word)}
                 class:m-selected={isSelected(word)}
+                class:m-bookmarked={isBookmarked(word)}
+                class:m-word-bookmarked={isWordBookmarked(word)}
                 class:m-pending={isPending(word)}
                 class:m-selected-start={isSelectedStart(line.words, index)}
                 class:m-selected-end={isSelectedEnd(line.words, index)}

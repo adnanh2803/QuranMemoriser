@@ -16,13 +16,22 @@ import {
   type SurahSummary,
   type VerseKey,
 } from "../../../domain/schemas"
-import type { BookmarkRepository } from "../data/bookmark-repository"
+import {
+  type BookmarkRepository,
+  type WordRangeBookmark,
+  wordRangeBookmarkKey,
+} from "../data/bookmark-repository"
 import type { CommandContext, MushafRepository } from "../data/mushaf-repository"
 import type { PageFontRegistry } from "../data/page-fonts"
+import AudioBar from "../../audio/components/AudioBar.svelte"
+import { RECITERS, ayahUrl } from "../../audio/data/audio-repository"
+import { tracksForJuz, tracksForSurah } from "../../audio/model/playlists"
+import { AudioPlayer } from "../../audio/model/player.svelte"
 import {
   dispatchSelection,
   ExtendRun,
   type RunCandidate,
+  type SelectionRun,
   type SelectionEngine,
   TapRun,
 } from "../model/selection.svelte"
@@ -62,16 +71,48 @@ let mobileHeaderOpen = $state(false)
 let pageInput = $state("1")
 let bookmarksOpen = $state(false)
 let savedBookmarks = $state<VerseKey[]>([])
+let savedWordBookmarks = $state<WordRangeBookmark[]>([])
+let downloadSurah = $state(1)
+let downloadProgress = $state<{
+  surah: number
+  done: number
+  total: number
+  error: string | null
+} | null>(null)
+let downloadedAudio = $state<{ surah: number; voices: { id: string; ayahs: number }[] }[]>([])
+let audioInventoryError = $state<string | null>(null)
 let swipeOrigin: { x: number; y: number } | null = null
 let suppressTapUntil = 0
+/** The recitation player: created once, lives across playlists. */
+const player = new AudioPlayer()
 /** All page chunks are loaded up front so page turns never wait on text data. */
 const chunks = new SvelteMap<number, PageChunk>()
 /** Slot indexes within verses, once every chunk has landed. */
 let ledger = $state<WordLedger | null>(null)
 
 const juz = $derived(meta ? repository.juzOfPage(current, meta) : null)
+const currentSurah = $derived(surahOfPage(current))
+const downloadSummary = $derived(surahs.find((item) => item.surah === downloadSurah) ?? null)
+const currentDownload = $derived(
+  downloadProgress?.surah === downloadSurah ? downloadProgress : null,
+)
+const selectedSurahDownloaded = $derived.by(() => {
+  if (downloadSummary === null) return false
+  const downloaded = downloadedAudio.find((item) => item.surah === downloadSurah)
+  return (
+    downloaded?.voices.length === RECITERS.length &&
+    downloaded.voices.every((voice) => voice.ayahs >= downloadSummary.verseCount)
+  )
+})
 const fitBody = $derived(meta?.fit.body ?? 19.76)
 const centreBelow = $derived(meta?.fit.centreBelow ?? 0.55)
+const savedBookmarkCount = $derived(savedBookmarks.length + savedWordBookmarks.length)
+
+function wordRangeLabel(range: SelectionRun): string {
+  const start = `${range.start.surah}:${range.start.ayah} word ${range.start.word}`
+  const end = `${range.end.surah}:${range.end.ayah} word ${range.end.word}`
+  return `${start}–${end}`
+}
 
 function restorePage(): number {
   const saved = Number.parseInt(localStorage.getItem(LAST_PAGE_KEY) ?? "", 10)
@@ -86,12 +127,15 @@ $effect(() => {
       if (cancelled) return
       meta = loadedMeta
       surahs = loadedSurahs
+      downloadSurah = surahOfPage(current)?.surah ?? 1
+      void refreshDownloadedAudio()
     })
     .catch((error: unknown) => {
       if (!cancelled) loadError = error instanceof Error ? error.message : String(error)
     })
   try {
     savedBookmarks = bookmarks.list()
+    savedWordBookmarks = bookmarks.listWordRanges()
   } catch (error) {
     loadError = error instanceof Error ? error.message : String(error)
   }
@@ -204,6 +248,129 @@ function goToJuz(juzNumber: number): void {
   if (page !== undefined) showPage(page)
 }
 
+/** The surah a page belongs to, by its printed page span. */
+function surahOfPage(page: number): SurahSummary | null {
+  return surahs.find((item) => page >= item.firstPage && page <= item.lastPage) ?? null
+}
+
+function playCurrentSurah(): void {
+  const summary = currentSurah
+  if (summary === null) return
+  player.play(tracksForSurah(summary.surah, summary.verseCount), {
+    kind: "surah",
+    label: summary.name,
+  })
+}
+
+/** Read the audio cache into a compact offline-download inventory. */
+async function refreshDownloadedAudio(): Promise<void> {
+  if (!("caches" in globalThis)) return
+  try {
+    const cache = await caches.open("qm-recitation")
+    const grouped = new Map<number, Map<string, Set<number>>>()
+    for (const request of await cache.keys()) {
+      const url = new URL(request.url)
+      const match = url.pathname.match(/\/data\/([^/]+)\/(\d{6})\.mp3$/)
+      if (!match) continue
+      const reciter = RECITERS.find((item) => item.folder === match[1])
+      if (!reciter) continue
+      const reference = match[2] ?? ""
+      const surah = Number(reference.slice(0, 3))
+      const ayah = Number(reference.slice(3))
+      const voices = grouped.get(surah) ?? new Map<string, Set<number>>()
+      const ayahs = voices.get(reciter.id) ?? new Set<number>()
+      ayahs.add(ayah)
+      voices.set(reciter.id, ayahs)
+      grouped.set(surah, voices)
+    }
+    downloadedAudio = [...grouped.entries()]
+      .map(([surah, voices]) => ({
+        surah,
+        voices: [...voices.entries()]
+          .map(([id, ayahs]) => ({ id, ayahs: ayahs.size }))
+          .sort((a, b) => a.id.localeCompare(b.id)),
+      }))
+      .sort((a, b) => a.surah - b.surah)
+    audioInventoryError = null
+  } catch (error) {
+    audioInventoryError = error instanceof Error ? error.message : String(error)
+  }
+}
+
+/** Cache every ayah from every listed reciter for offline playback. */
+async function downloadSelectedSurah(): Promise<void> {
+  const summary = downloadSummary
+  if (
+    summary === null ||
+    (downloadProgress !== null && downloadProgress.done < downloadProgress.total && downloadProgress.error === null)
+  ) return
+  if (!("caches" in globalThis)) {
+    downloadProgress = {
+      surah: summary.surah,
+      done: 0,
+      total: summary.verseCount * RECITERS.length,
+      error: "Offline downloads are not supported in this browser",
+    }
+    return
+  }
+
+  const total = summary.verseCount * RECITERS.length
+  downloadProgress = { surah: summary.surah, done: 0, total, error: null }
+  try {
+    const cache = await caches.open("qm-recitation")
+    let next = 0
+    let failure: string | null = null
+    const workers = Array.from({ length: Math.min(4, total) }, async () => {
+      while (next < total && failure === null) {
+        const taskIndex = next++
+        const reciter = RECITERS[Math.floor(taskIndex / summary.verseCount)]
+        const ayah = (taskIndex % summary.verseCount) + 1
+        if (!reciter) continue
+        try {
+          const url = ayahUrl(reciter, summary.surah, ayah)
+          if (!(await cache.match(url))) {
+            const response = await fetch(url, { mode: "cors" })
+            if (!response.ok) {
+              failure = `${reciter.label}, ayah ${ayah}: HTTP ${response.status}`
+              break
+            }
+            await cache.put(url, response.clone())
+          }
+          if (downloadProgress?.surah === summary.surah) {
+            downloadProgress = { ...downloadProgress, done: downloadProgress.done + 1 }
+          }
+        } catch (error) {
+          failure = error instanceof Error ? error.message : String(error)
+        }
+      }
+    })
+    await Promise.all(workers)
+    if (failure !== null) throw new Error(failure)
+    await refreshDownloadedAudio()
+  } catch (error) {
+    downloadProgress = {
+      surah: summary.surah,
+      done: downloadProgress?.done ?? 0,
+      total,
+      error: error instanceof Error ? error.message : String(error),
+    }
+    await refreshDownloadedAudio()
+  }
+}
+
+function playCurrentJuz(): void {
+  const juzNumber = juz
+  if (juzNumber === null) return
+  repository
+    .ayahs()
+    .then((all) => {
+      player.play(tracksForJuz(all, juzNumber), { kind: "juz", label: `Juz ${juzNumber}` })
+    })
+    .catch((error: unknown) => {
+      loadError = error instanceof Error ? error.message : String(error)
+    })
+}
+
 function openList(): void {
   if (ayahs.length > 0) {
     listView = true
@@ -254,6 +421,29 @@ function jumpToBookmark(key: VerseKey): void {
 function removeBookmark(key: VerseKey): void {
   try {
     savedBookmarks = bookmarks.remove(key)
+  } catch (error) {
+    loadError = error instanceof Error ? error.message : String(error)
+  }
+}
+
+function jumpToWordBookmark(range: WordRangeBookmark): void {
+  repository
+    .ayahs()
+    .then((all) => {
+      const ayah = all.find((item) => item.surah === range.start.surah && item.ayah === range.start.ayah)
+      if (ayah) {
+        bookmarksOpen = false
+        showPage(ayah.page)
+      }
+    })
+    .catch((error: unknown) => {
+      loadError = error instanceof Error ? error.message : String(error)
+    })
+}
+
+function removeWordBookmark(range: WordRangeBookmark): void {
+  try {
+    savedWordBookmarks = bookmarks.removeWordRange(range)
   } catch (error) {
     loadError = error instanceof Error ? error.message : String(error)
   }
@@ -342,11 +532,17 @@ function cycleTheme(): void {
 />
 
 <div
-  class="relative flex h-dvh flex-col overflow-hidden bg-bg text-ink"
-  style="--reader-chrome: {mobileHeaderOpen ? '236px' : '172px'}"
+  class="relative flex h-[100svh] flex-col overflow-hidden bg-bg text-ink"
 >
+  {#if mobileHeaderOpen}
+    <button
+      class="fixed inset-0 z-30 bg-black/25 md:hidden"
+      onclick={() => (mobileHeaderOpen = false)}
+      aria-label="Close controls"
+    ></button>
+  {/if}
   <header
-    class="{mobileHeaderOpen ? 'grid' : 'hidden'} z-10 shrink-0 grid-cols-1 items-center gap-x-4 gap-y-1.5 border-b border-hairline bg-surface/95 px-4 py-1.5 shadow-sm backdrop-blur-md md:grid md:grid-cols-[auto_minmax(0,1fr)] md:gap-y-2 md:px-6 md:py-2"
+    class="{mobileHeaderOpen ? 'fixed inset-y-0 right-0 z-40 flex w-[min(22rem,88vw)] flex-col gap-y-3 overflow-y-auto border-l border-hairline bg-surface px-4 py-4 shadow-xl' : 'hidden'} md:relative md:inset-auto md:z-10 md:grid md:w-auto md:shrink-0 md:grid-cols-[auto_minmax(0,1fr)] md:items-center md:gap-x-4 md:gap-y-2 md:overflow-visible md:border-l-0 md:border-b md:bg-surface/95 md:px-6 md:py-2 md:shadow-sm md:backdrop-blur-md"
   >
     <div class="flex w-full min-w-0 items-center gap-2.5">
       <img
@@ -392,6 +588,26 @@ function cycleTheme(): void {
           <option value={juzNumber}>{juzNumber}</option>
         {/each}
       </select>
+      <button
+        class="flex items-center gap-1 rounded-lg border border-hairline bg-bg px-2 py-1.5 text-sm shadow-sm transition hover:border-accent/30 hover:bg-accent-soft disabled:opacity-40"
+        onclick={playCurrentSurah}
+        disabled={surahs.length === 0}
+        aria-label="Play this surah"
+        title="Play this surah"
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.54.84l10-6.5a1 1 0 0 0 0-1.68l-10-6.5A1 1 0 0 0 8 5.5z"></path></svg>
+        Surah
+      </button>
+      <button
+        class="flex items-center gap-1 rounded-lg border border-hairline bg-bg px-2 py-1.5 text-sm shadow-sm transition hover:border-accent/30 hover:bg-accent-soft disabled:opacity-40"
+        onclick={playCurrentJuz}
+        disabled={juz === null}
+        aria-label="Play this juz"
+        title="Play this juz"
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.54.84l10-6.5a1 1 0 0 0 0-1.68l-10-6.5A1 1 0 0 0 8 5.5z"></path></svg>
+        Juz
+      </button>
       <form class="flex items-center gap-1" onsubmit={(event) => { event.preventDefault(); goToPage() }}>
         <input
           class="w-16 rounded-lg border border-hairline bg-bg px-2 py-1.5 text-sm tabular-nums shadow-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
@@ -435,6 +651,70 @@ function cycleTheme(): void {
         </svg>
       </button>
     </div>
+    <section class="col-span-full w-full border-t border-hairline pt-3 md:col-span-2" aria-labelledby="offline-audio-title">
+      <div class="mb-2 flex items-center justify-between gap-2">
+        <h2 id="offline-audio-title" class="text-xs font-semibold uppercase tracking-wide text-ink-muted">Offline audio</h2>
+        <button
+          class="rounded-md px-2 py-1 text-xs text-ink-muted transition hover:bg-accent-soft hover:text-ink"
+          onclick={refreshDownloadedAudio}
+          aria-label="Refresh downloaded audio list"
+        >Refresh</button>
+      </div>
+      <label class="mb-2 block text-xs text-ink-muted" for="offline-audio-surah">Surah</label>
+      <div class="flex items-center gap-2">
+        <select
+          id="offline-audio-surah"
+          class="min-w-0 flex-1 rounded-lg border border-hairline bg-bg px-2.5 py-2 text-sm shadow-sm outline-none focus:border-accent"
+          bind:value={downloadSurah}
+          disabled={downloadProgress !== null && downloadProgress.done < downloadProgress.total && downloadProgress.error === null}
+          aria-label="Choose surah to download"
+        >
+          {#each surahs as surah (surah.surah)}
+            <option value={surah.surah}>{surah.surah}. {surah.name}</option>
+          {/each}
+        </select>
+        <button
+          class="shrink-0 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+          onclick={downloadSelectedSurah}
+          disabled={downloadSummary === null || (downloadProgress !== null && downloadProgress.done < downloadProgress.total && downloadProgress.error === null)}
+        >
+          {#if currentDownload !== null && currentDownload.done < currentDownload.total && currentDownload.error === null}
+            {currentDownload.done}/{currentDownload.total}
+          {:else if currentDownload !== null && currentDownload.done === currentDownload.total && currentDownload.error === null}
+            Downloaded
+          {:else if selectedSurahDownloaded}
+            Downloaded
+          {:else}
+            Download all voices
+          {/if}
+        </button>
+      </div>
+      <p class="mt-1 text-[11px] text-ink-muted">Downloads {RECITERS.length} reciters for offline playback.</p>
+      {#if currentDownload?.error}
+        <p class="mt-2 text-xs text-red-700" role="alert">Download failed: {currentDownload.error}</p>
+      {/if}
+      <div class="mt-3 border-t border-hairline pt-2">
+        <h3 class="mb-1 text-xs font-medium text-ink">Downloaded audio</h3>
+        {#if audioInventoryError}
+          <p class="text-xs text-red-700">{audioInventoryError}</p>
+        {:else if downloadedAudio.length === 0}
+          <p class="text-xs text-ink-muted">No audio files are cached yet.</p>
+        {:else}
+          <ul class="max-h-40 space-y-2 overflow-y-auto pr-1">
+            {#each downloadedAudio as item (item.surah)}
+              {@const summary = surahs.find((surah) => surah.surah === item.surah)}
+              <li class="rounded-lg bg-bg px-2.5 py-2 text-xs">
+                <div class="font-medium text-ink">{item.surah}. {summary?.name ?? `Surah ${item.surah}`}</div>
+                {#each item.voices as voice (voice.id)}
+                  {@const reciter = RECITERS.find((entry) => entry.id === voice.id)}
+                  <div class="mt-0.5 text-ink-muted">{reciter?.label ?? voice.id}: {voice.ayahs}/{summary?.verseCount ?? "?"} ayahs</div>
+                {/each}
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
+    </section>
     <div
       class="relative col-span-full flex w-full flex-wrap items-center justify-start gap-1.5 md:col-span-2"
     >
@@ -499,22 +779,42 @@ function cycleTheme(): void {
         class="rounded-lg border border-hairline px-3 py-1.5 text-sm transition hover:bg-accent-soft"
         onclick={() => (bookmarksOpen = !bookmarksOpen)}
         aria-expanded={bookmarksOpen}
-        aria-label="Bookmarks ({savedBookmarks.length})"
+        aria-label="Bookmarks ({savedBookmarkCount})"
       >
         Saved
         <span class="ml-1 rounded-full bg-accent-soft px-1.5 py-0.5 text-xs font-medium text-accent">
-          {savedBookmarks.length}
+          {savedBookmarkCount}
         </span>
       </button>
       {#if bookmarksOpen}
         <div class="absolute right-0 top-full z-30 mt-2 max-h-80 w-64 overflow-auto rounded-xl border border-hairline bg-surface-raised p-2 shadow-xl ring-1 ring-black/5">
-          {#if savedBookmarks.length === 0}
+          {#if savedBookmarkCount === 0}
             <p class="p-2 text-sm text-ink-muted">No bookmarks yet</p>
           {:else}
             {#each savedBookmarks as key (key)}
               <div class="flex items-center gap-1">
                 <button class="flex-1 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent-soft" onclick={() => jumpToBookmark(key)}>{key}</button>
                 <button class="rounded px-2 py-1 text-ink-muted hover:bg-accent-soft" aria-label="Remove bookmark {key}" onclick={() => removeBookmark(key)}>×</button>
+              </div>
+            {/each}
+            {#each savedWordBookmarks as range (wordRangeBookmarkKey(range))}
+              {@const label = wordRangeLabel(range)}
+              <div class="flex items-center gap-1">
+                <button
+                  class="flex-1 rounded-lg px-3 py-2 text-left text-sm leading-snug hover:bg-accent-soft"
+                  onclick={() => jumpToWordBookmark(range)}
+                  title="Go to bookmarked word range"
+                >
+                  <span class="mr-1 text-[10px] font-semibold text-accent uppercase">Words</span>
+                  {label}
+                </button>
+                <button
+                  class="rounded px-2 py-1 text-ink-muted hover:bg-accent-soft"
+                  aria-label="Remove word bookmark {label}"
+                  onclick={() => removeWordBookmark(range)}
+                >
+                  ×
+                </button>
               </div>
             {/each}
           {/if}
@@ -537,7 +837,7 @@ function cycleTheme(): void {
 
   {#if !mobileHeaderOpen}
     <button
-      class="absolute top-2 right-3 z-20 rounded-xl border border-hairline bg-surface/95 p-2 text-ink-muted shadow-md backdrop-blur-md transition hover:bg-accent-soft hover:text-accent md:hidden"
+      class="absolute top-[max(0.5rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] z-20 rounded-xl border border-hairline bg-surface/95 p-2 text-ink-muted shadow-md backdrop-blur-md transition hover:bg-accent-soft hover:text-accent md:hidden"
       onclick={() => (mobileHeaderOpen = true)}
       aria-label="Show controls"
       title="Show controls"
@@ -551,7 +851,7 @@ function cycleTheme(): void {
   <main
     bind:this={viewport}
     onpointerdown={onPagePointerDown}
-    class="relative min-h-0 flex-1 overflow-x-hidden"
+    class="relative min-h-0 flex-1 overflow-x-hidden overscroll-none"
     class:overflow-y-auto={listView}
     class:overflow-hidden={!listView}
   >
@@ -559,7 +859,7 @@ function cycleTheme(): void {
       <p class="mx-auto mt-6 max-w-xl rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800" role="alert">{loadError}</p>
     {/if}
     {#if listView}
-      <AyahList scrollElement={viewport} {ayahs} {selection} onTap={tapAyah} />
+      <AyahList scrollElement={viewport} {ayahs} {selection} bookmarks={savedBookmarks} onTap={tapAyah} />
     {:else}
       <div class="page-stage sheet-anchor">
         {#key current}
@@ -577,6 +877,8 @@ function cycleTheme(): void {
               {fonts}
               {selection}
               {ledger}
+              bookmarkedKeys={savedBookmarks}
+              bookmarkedWordRanges={savedWordBookmarks}
               onSelect={select}
             />
           </div>
@@ -585,5 +887,15 @@ function cycleTheme(): void {
     {/if}
   </main>
 
-  <SelectionBanner {selection} {repository} {bookmarks} onBookmarks={(keys) => (savedBookmarks = keys)} />
+  <SelectionBanner
+    {selection}
+    {repository}
+    {bookmarks}
+    {player}
+    {context}
+    raised={player.active}
+    onBookmarks={(keys) => (savedBookmarks = keys)}
+    onWordBookmarks={(ranges) => (savedWordBookmarks = ranges)}
+  />
+  <AudioBar {player} {surahs} />
 </div>

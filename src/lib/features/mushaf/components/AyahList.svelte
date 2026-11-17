@@ -8,10 +8,12 @@ interface Props {
   scrollElement: HTMLElement | null
   ayahs: AyahMeta[]
   selection: SelectionEngine
+  bookmarks: VerseKey[]
   onTap: (key: VerseKey, extend: boolean) => void
 }
 
-let { scrollElement, ayahs, selection, onTap }: Props = $props()
+let { scrollElement, ayahs, selection, bookmarks, onTap }: Props = $props()
+const bookmarkedSet = $derived(new Set(bookmarks))
 
 const virtualizer = createVirtualizer<HTMLElement, HTMLElement>({
   count: 0,
@@ -36,15 +38,31 @@ function measureElement(element: HTMLElement): void {
     {@const ayah = ayahs[item.index]}
     {#if ayah}
       {@const key = verseKey(ayah.surah, ayah.ayah)}
+      {@const isBookmarked = bookmarkedSet.has(key)}
       <article
-        class="absolute left-3 right-3 rounded-xl border border-hairline bg-surface px-4 py-3 shadow-sm"
-        class:bg-accent-soft={selection.has(key)}
+        class="absolute left-3 right-3 rounded-xl border border-hairline bg-surface px-4 py-3 shadow-sm {isBookmarked ? 'border-accent/50' : ''}"
+        class:bg-accent-soft={selection.has(key) || isBookmarked}
         data-index={item.index}
         use:measureElement
         style="top: 0; transform: translateY({item.start}px)"
       >
         <div class="mb-2 flex items-center justify-between gap-3 text-xs text-ink-muted">
-          <span>{ayah.surah}:{ayah.ayah}</span>
+          <span class="inline-flex items-center gap-1.5">
+            {ayah.surah}:{ayah.ayah}
+            {#if isBookmarked}
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                class="text-accent"
+                role="img"
+                aria-label="Bookmarked"
+              >
+                <path d="M6 4.75A1.75 1.75 0 0 1 7.75 3h8.5A1.75 1.75 0 0 1 18 4.75V21l-6-3.5L6 21V4.75z"></path>
+              </svg>
+            {/if}
+          </span>
           <span>Page {ayah.page} · Juz {ayah.juz}</span>
         </div>
         <button

@@ -14,6 +14,17 @@ export default defineConfig({
       // whole mushaf works offline from the first install.
       globDirectory: "dist",
       globPatterns: ["**/*.{js,css,html,svg,woff2,webmanifest,json,png}"],
+      // Additional reciter timing maps are loaded and cached on demand so
+      // supporting more voices does not inflate the initial install.
+      globIgnores: [
+        "data/audio-timings/abdul-*.json",
+        "data/audio-timings/hani-rifai.json",
+        "data/audio-timings/husary*.json",
+        "data/audio-timings/minshawy-mujawwad.json",
+        "data/audio-timings/shaatree.json",
+        "data/audio-timings/shuraym.json",
+        "data/audio-timings/tablaway.json",
+      ],
       disable: process.env.VITEST === "true",
     }),
   ],

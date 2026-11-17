@@ -11,7 +11,7 @@
  * Adapted from the proven layout logic of Quran-On-Web (MIT licence).
  */
 /** The gap a centred line opens between its words — must match `.m-short`. */
-const CENTRE_GAP_EM = 0.32
+const CENTRE_GAP_EM = 0.24
 
 /** Width a line wants, as a fraction of the measure. */
 function naturalWidth(line: HTMLElement, avail: number, magnify: number): number {

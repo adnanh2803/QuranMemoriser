@@ -30,11 +30,13 @@
  *  - public/data/ayahs.json       (6236 ayah metadata rows, print pages)
  *  - public/data/pages/pNNN.json  (604 page layout chunks)
  *  - public/data/word-index.json  (slot indexes within verses, verse totals)
+ *  - public/data/audio-timings/  (word timing maps for matching reciters)
  *  - public/fonts/…               (604 QCF page fonts + basmalah + fallback)
  *
  * Run with:  node scripts/build-data.ts
  */
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises"
+import { inflateRawSync } from "node:zlib"
 import path from "node:path"
 
 import {
@@ -68,6 +70,7 @@ const CACHE = path.join(ROOT, ".cache", "sources")
 const OUT_DATA = path.join(ROOT, "public", "data")
 const OUT_PAGES = path.join(OUT_DATA, "pages")
 const OUT_FONTS = path.join(ROOT, "public", "fonts")
+const OUT_TIMINGS = path.join(OUT_DATA, "audio-timings")
 
 export interface Sources {
   chapters: ApiChapter[]
@@ -471,6 +474,85 @@ async function writeJson(file: string, value: unknown): Promise<number> {
   return Buffer.byteLength(json, "utf8")
 }
 
+/** Read one file from the pinned ZIP source without adding a ZIP dependency. */
+function zipEntry(archive: Buffer, wantedName: string): Buffer {
+  let endRecord = -1
+  const searchStart = Math.max(0, archive.length - 65_557)
+  for (let offset = archive.length - 22; offset >= searchStart; offset--) {
+    if (archive.readUInt32LE(offset) === 0x06054b50) {
+      endRecord = offset
+      break
+    }
+  }
+  if (endRecord < 0) throw new Error("quran-align archive has no end record")
+
+  const entryCount = archive.readUInt16LE(endRecord + 10)
+  let offset = archive.readUInt32LE(endRecord + 16)
+  for (let index = 0; index < entryCount; index++) {
+    if (archive.readUInt32LE(offset) !== 0x02014b50) {
+      throw new Error("quran-align archive has a malformed directory")
+    }
+    const method = archive.readUInt16LE(offset + 10)
+    const compressedSize = archive.readUInt32LE(offset + 20)
+    const uncompressedSize = archive.readUInt32LE(offset + 24)
+    const nameLength = archive.readUInt16LE(offset + 28)
+    const extraLength = archive.readUInt16LE(offset + 30)
+    const commentLength = archive.readUInt16LE(offset + 32)
+    const localOffset = archive.readUInt32LE(offset + 42)
+    const name = archive.toString("utf8", offset + 46, offset + 46 + nameLength)
+
+    if (name === wantedName) {
+      if (archive.readUInt32LE(localOffset) !== 0x04034b50) {
+        throw new Error(`quran-align entry ${wantedName} has a malformed header`)
+      }
+      const localNameLength = archive.readUInt16LE(localOffset + 26)
+      const localExtraLength = archive.readUInt16LE(localOffset + 28)
+      const dataOffset = localOffset + 30 + localNameLength + localExtraLength
+      const compressed = archive.subarray(dataOffset, dataOffset + compressedSize)
+      const data = method === 0 ? compressed : method === 8 ? inflateRawSync(compressed) : null
+      if (!data || data.length !== uncompressedSize) {
+        throw new Error(`quran-align entry ${wantedName} could not be decompressed`)
+      }
+      return data
+    }
+    offset += 46 + nameLength + extraLength + commentLength
+  }
+  throw new Error(`quran-align archive is missing ${wantedName}`)
+}
+
+interface AlignmentRow {
+  surah: number
+  ayah: number
+  /** [zero-based start word, exclusive end word, start ms, end ms]. */
+  segments: [number, number, number, number][]
+}
+
+function readAlignment(archive: Buffer, filename: string): Record<string, AlignmentRow["segments"]> {
+  const rows = JSON.parse(zipEntry(archive, filename).toString("utf8")) as AlignmentRow[]
+  const timings: Record<string, AlignmentRow["segments"]> = {}
+  for (const row of rows) {
+    if (!Number.isInteger(row.surah) || !Number.isInteger(row.ayah)) {
+      throw new Error(`quran-align ${filename} contains a malformed row`)
+    }
+    // A small number of rows in the source have no usable alignment. Leave
+    // those verses unavailable for clipped playback rather than inventing times.
+    if (row.segments === undefined) continue
+    if (!Array.isArray(row.segments)) {
+      throw new Error(`quran-align ${filename} contains malformed segments`)
+    }
+    if (row.segments.some((segment) => segment.length !== 4 || segment.some((part) => !Number.isFinite(part)))) {
+      throw new Error(`quran-align ${filename} contains a malformed segment`)
+    }
+    timings[`${row.surah}:${row.ayah}`] = row.segments
+  }
+  if (rows.length !== 6236) {
+    throw new Error(`quran-align ${filename} has ${rows.length} verse rows, expected 6236`)
+  }
+  const missing = 6236 - Object.keys(timings).length
+  if (missing > 0) console.warn(`quran-align ${filename}: ${missing} verses have no word timings`)
+  return timings
+}
+
 async function main(): Promise<void> {
   console.log("loading sources…")
   const sources = await loadSources()
@@ -558,6 +640,31 @@ async function main(): Promise<void> {
   wordIndexFileSchema.parse(wordIndex)
   const wordIndexBytes = await writeJson(path.join(OUT_DATA, "word-index.json"), wordIndex)
 
+  // Word-level playback ranges for the matching EveryAyah recordings.
+  const alignmentArchive = await readFile(path.join(CACHE, "quran-align-data.zip"))
+  await mkdir(OUT_TIMINGS, { recursive: true })
+  const timingFiles = [
+    ["alafasy", "Alafasy_128kbps.json"],
+    ["husary", "Husary_64kbps.json"],
+    ["minshawy", "Minshawy_Murattal_128kbps.json"],
+    ["abdul-basit-murattal", "Abdul_Basit_Murattal_64kbps.json"],
+    ["abdul-basit-mujawwad", "Abdul_Basit_Mujawwad_128kbps.json"],
+    ["shaatree", "Abu_Bakr_Ash-Shaatree_128kbps.json"],
+    ["hani-rifai", "Hani_Rifai_192kbps.json"],
+    ["husary-muallim", "Husary_Muallim_128kbps.json"],
+    ["minshawy-mujawwad", "Minshawy_Mujawwad_192kbps.json"],
+    ["tablaway", "Mohammad_al_Tablaway_128kbps.json"],
+    ["shuraym", "Saood_ash-Shuraym_128kbps.json"],
+  ] as const
+  const timingBytes = await Promise.all(
+    timingFiles.map(([name, filename]) =>
+      writeJson(
+        path.join(OUT_TIMINGS, `${name}.json`),
+        readAlignment(alignmentArchive, filename),
+      ),
+    ),
+  )
+
   // --- build metadata files ---
   const surahs = buildSurahs(sources, walk)
   const ayahs = buildAyahs(sources, walk, ayahKeys)
@@ -627,6 +734,7 @@ async function main(): Promise<void> {
   console.log(`surahs.json: ${(surahsBytes / 1024).toFixed(1)} KB`)
   console.log(`ayahs.json: ${(ayahsBytes / 1024).toFixed(1)} KB`)
   console.log(`word-index.json: ${(wordIndexBytes / 1024).toFixed(1)} KB`)
+  console.log(`word timings: ${(timingBytes.reduce((sum, bytes) => sum + bytes, 0) / 1024).toFixed(1)} KB`)
   console.log(`meta.json: ${(metaBytes / 1024).toFixed(1)} KB`)
   console.log(`page chunks: ${(totalChunkBytes / 1024 / 1024).toFixed(2)} MB (604 files)`)
   console.log(`fonts copied: ${fontCount} page fonts + basmalah + sura-names + uthmanic-hafs`)

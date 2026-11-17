@@ -12,6 +12,9 @@
  *   cross-check source)
  * - static.qurancdn.com — UthmanicHafs Unicode fallback font
  *
+ * - cpfair/quran-align: word timings for 11 matching EveryAyah recitations,
+ *   pinned to its 2016-11-24 release
+ *
  * Idempotent: every file is hashed; matching files are not re-downloaded.
  * Run with:  node scripts/fetch-sources.ts
  */
@@ -34,6 +37,9 @@ const FONTS_BASE = "https://raw.githubusercontent.com/mustafa0x/qpc-fonts/master
 const FONT_TABLE_URL = "https://raw.githubusercontent.com/mustafa0x/qpc-fonts/master/mushaf.txt"
 const UTHMANIC_HAFS_URL =
   "https://static.qurancdn.com/fonts/quran/hafs/uthmanic_hafs/UthmanicHafs1Ver18.woff2"
+const QURAN_ALIGN_URL =
+  "https://github.com/cpfair/quran-align/releases/download/release-2016-11-24/quran-align-data-2016-11-24.zip"
+const QURAN_ALIGN_SHA256 = "5eeb045d8a7895208c94d2d7ec243567f8f550728835411527c4ffa1e789c9b7"
 
 /** Base for assets taken from the pinned reference repository (MIT). */
 const QURAN_ON_WEB_BASE =
@@ -117,6 +123,10 @@ const woff2 = (buffer: Buffer): void => {
   if (buffer.subarray(0, 4).toString("ascii") !== "wOF2") {
     throw new Error("not a WOFF2 file")
   }
+}
+
+const zip = (buffer: Buffer): void => {
+  if (buffer.readUInt32LE(0) !== 0x04034b50) throw new Error("not a ZIP archive")
 }
 
 const glyphTable = (buffer: Buffer): void => {
@@ -234,6 +244,19 @@ async function main(): Promise<void> {
   )
 
   // Fonts: 604 page fonts + basmalah + Unicode fallback
+  jobs.push(
+    limit(async () => {
+      const before = manifest.size
+      await cachedDownload(
+        "quran-align-data.zip",
+        QURAN_ALIGN_URL,
+        manifest,
+        allOf(zip, pinnedSha256(QURAN_ALIGN_SHA256)),
+      )
+      if (manifest.size > before) downloaded++
+    }),
+  )
+
   const fontJobs: Promise<void>[] = []
   for (let page = 1; page <= 604; page++) {
     const id = String(page).padStart(3, "0")

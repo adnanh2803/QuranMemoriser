@@ -81,15 +81,23 @@
 
 html {
   height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body {
-  min-height: 100%;
+  height: 100%;
+  overflow: hidden;
   background-color: var(--bg);
   color: var(--ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
+}
+
+#app {
+  height: 100%;
+  overflow: hidden;
 }
 
 /* Respect reduced-motion preferences across the app. */
