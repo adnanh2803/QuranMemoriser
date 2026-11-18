@@ -347,6 +347,10 @@
   line-height: 1;
   white-space: pre;
   cursor: default;
+  /* The basmalah's opening flourish hangs about 1.5em left of its advance
+     box. The box is centred, but its ink sits half that overhang too far
+     left; nudge the run back to its optical centre. */
+  transform: translateX(0.75em);
 }
 
 /* --- folio ---------------------------------------------------------------- */
