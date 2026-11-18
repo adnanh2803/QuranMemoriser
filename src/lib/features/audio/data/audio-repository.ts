@@ -11,31 +11,75 @@ export interface Reciter {
   label: string
   /** The reciter's folder under everyayah.com/data. */
   folder: string
+  /** The EveryAyah encoding, shown when choosing an offline download. */
+  bitrateKbps: number
 }
 
 const DEFAULT_RECITER: Reciter = {
   id: "alafasy",
   label: "Mishary Alafasy",
   folder: "Alafasy_128kbps",
+  bitrateKbps: 128,
 }
 
 export const RECITERS: Reciter[] = [
   DEFAULT_RECITER,
-  { id: "husary", label: "Mahmoud Al-Husary (Murattal)", folder: "Husary_64kbps" },
-  { id: "minshawi", label: "Al-Minshawi (Murattal)", folder: "Minshawy_Murattal_128kbps" },
-  { id: "abdulbasit", label: "Abdul Basit (Murattal)", folder: "Abdul_Basit_Murattal_64kbps" },
+  { id: "husary", label: "Mahmoud Al-Husary (Murattal)", folder: "Husary_64kbps", bitrateKbps: 64 },
+  {
+    id: "minshawi",
+    label: "Al-Minshawi (Murattal)",
+    folder: "Minshawy_Murattal_128kbps",
+    bitrateKbps: 128,
+  },
+  {
+    id: "abdulbasit",
+    label: "Abdul Basit (Murattal)",
+    folder: "Abdul_Basit_Murattal_64kbps",
+    bitrateKbps: 64,
+  },
   {
     id: "abdulbasit-mujawwad",
     label: "Abdul Basit (Mujawwad)",
     folder: "Abdul_Basit_Mujawwad_128kbps",
+    bitrateKbps: 128,
   },
-  { id: "sudais", label: "Abdurrahman As-Sudais", folder: "Abdurrahmaan_As-Sudais_192kbps" },
-  { id: "shaatree", label: "Abu Bakr Ash-Shaatree", folder: "Abu_Bakr_Ash-Shaatree_128kbps" },
-  { id: "hani-rifai", label: "Hani Rifai", folder: "Hani_Rifai_192kbps" },
-  { id: "husary-muallim", label: "Al-Husary (Muallim)", folder: "Husary_Muallim_128kbps" },
-  { id: "minshawi-mujawwad", label: "Al-Minshawi (Mujawwad)", folder: "Minshawy_Mujawwad_192kbps" },
-  { id: "tablaway", label: "Mohammad al-Tablaway", folder: "Mohammad_al_Tablaway_128kbps" },
-  { id: "shuraym", label: "Saood ash-Shuraym", folder: "Saood_ash-Shuraym_128kbps" },
+  {
+    id: "sudais",
+    label: "Abdurrahman As-Sudais",
+    folder: "Abdurrahmaan_As-Sudais_192kbps",
+    bitrateKbps: 192,
+  },
+  {
+    id: "shaatree",
+    label: "Abu Bakr Ash-Shaatree",
+    folder: "Abu_Bakr_Ash-Shaatree_128kbps",
+    bitrateKbps: 128,
+  },
+  { id: "hani-rifai", label: "Hani Rifai", folder: "Hani_Rifai_192kbps", bitrateKbps: 192 },
+  {
+    id: "husary-muallim",
+    label: "Al-Husary (Muallim)",
+    folder: "Husary_Muallim_128kbps",
+    bitrateKbps: 128,
+  },
+  {
+    id: "minshawi-mujawwad",
+    label: "Al-Minshawi (Mujawwad)",
+    folder: "Minshawy_Mujawwad_192kbps",
+    bitrateKbps: 192,
+  },
+  {
+    id: "tablaway",
+    label: "Mohammad al-Tablaway",
+    folder: "Mohammad_al_Tablaway_128kbps",
+    bitrateKbps: 128,
+  },
+  {
+    id: "shuraym",
+    label: "Saood ash-Shuraym",
+    folder: "Saood_ash-Shuraym_128kbps",
+    bitrateKbps: 128,
+  },
 ]
 
 const RECITER_KEY = "qm.reciter"

@@ -17,7 +17,8 @@ import {
   type VerseKey,
 } from "../../../domain/schemas"
 import AudioBar from "../../audio/components/AudioBar.svelte"
-import { ayahUrl, RECITERS } from "../../audio/data/audio-repository"
+import OfflineAudioDialog from "../../audio/components/OfflineAudioDialog.svelte"
+import type { OfflineAudioRepository } from "../../audio/data/offline-audio-repository"
 import { AudioPlayer } from "../../audio/model/player.svelte"
 import { tracksForJuz, tracksForSurah } from "../../audio/model/playlists"
 import {
@@ -45,10 +46,11 @@ interface Props {
   bookmarks: BookmarkRepository
   fonts: PageFontRegistry
   selection: SelectionEngine
+  offlineAudio: OfflineAudioRepository
   context: Promise<CommandContext>
 }
 
-let { repository, bookmarks, fonts, selection, context }: Props = $props()
+let { repository, bookmarks, fonts, selection, offlineAudio, context }: Props = $props()
 
 const PAGE_COUNT = 604
 const LAST_PAGE_KEY = "qm.page"
@@ -72,15 +74,7 @@ let pageInput = $state("1")
 let bookmarksOpen = $state(false)
 let savedBookmarks = $state<VerseKey[]>([])
 let savedWordBookmarks = $state<WordRangeBookmark[]>([])
-let downloadSurah = $state(1)
-let downloadProgress = $state<{
-  surah: number
-  done: number
-  total: number
-  error: string | null
-} | null>(null)
-let downloadedAudio = $state<{ surah: number; voices: { id: string; ayahs: number }[] }[]>([])
-let audioInventoryError = $state<string | null>(null)
+let offlineAudioOpen = $state(false)
 let swipeOrigin: { x: number; y: number } | null = null
 let suppressTapUntil = 0
 /** The recitation player: created once, lives across playlists. */
@@ -93,18 +87,6 @@ let ledger = $state<WordLedger | null>(null)
 const juz = $derived(meta ? repository.juzOfPage(current, meta) : null)
 const hizb = $derived(meta ? repository.hizbOfPage(current, meta) : null)
 const currentSurah = $derived(surahOfPage(current))
-const downloadSummary = $derived(surahs.find((item) => item.surah === downloadSurah) ?? null)
-const currentDownload = $derived(
-  downloadProgress?.surah === downloadSurah ? downloadProgress : null,
-)
-const selectedSurahDownloaded = $derived.by(() => {
-  if (downloadSummary === null) return false
-  const downloaded = downloadedAudio.find((item) => item.surah === downloadSurah)
-  return (
-    downloaded?.voices.length === RECITERS.length &&
-    downloaded.voices.every((voice) => voice.ayahs >= downloadSummary.verseCount)
-  )
-})
 const fitBody = $derived(meta?.fit.body ?? 19.76)
 const centreBelow = $derived(meta?.fit.centreBelow ?? 0.55)
 const savedBookmarkCount = $derived(savedBookmarks.length + savedWordBookmarks.length)
@@ -154,8 +136,6 @@ $effect(() => {
       if (cancelled) return
       meta = loadedMeta
       surahs = loadedSurahs
-      downloadSurah = surahOfPage(current)?.surah ?? 1
-      void refreshDownloadedAudio()
     })
     .catch((error: unknown) => {
       if (!cancelled) loadError = error instanceof Error ? error.message : String(error)
@@ -291,105 +271,6 @@ function playCurrentSurah(): void {
   })
 }
 
-/** Read the audio cache into a compact offline-download inventory. */
-async function refreshDownloadedAudio(): Promise<void> {
-  if (!("caches" in globalThis)) return
-  try {
-    const cache = await caches.open("qm-recitation")
-    const grouped = new Map<number, Map<string, Set<number>>>()
-    for (const request of await cache.keys()) {
-      const url = new URL(request.url)
-      const match = url.pathname.match(/\/data\/([^/]+)\/(\d{6})\.mp3$/)
-      if (!match) continue
-      const reciter = RECITERS.find((item) => item.folder === match[1])
-      if (!reciter) continue
-      const reference = match[2] ?? ""
-      const surah = Number(reference.slice(0, 3))
-      const ayah = Number(reference.slice(3))
-      const voices = grouped.get(surah) ?? new Map<string, Set<number>>()
-      const ayahs = voices.get(reciter.id) ?? new Set<number>()
-      ayahs.add(ayah)
-      voices.set(reciter.id, ayahs)
-      grouped.set(surah, voices)
-    }
-    downloadedAudio = [...grouped.entries()]
-      .map(([surah, voices]) => ({
-        surah,
-        voices: [...voices.entries()]
-          .map(([id, ayahs]) => ({ id, ayahs: ayahs.size }))
-          .sort((a, b) => a.id.localeCompare(b.id)),
-      }))
-      .sort((a, b) => a.surah - b.surah)
-    audioInventoryError = null
-  } catch (error) {
-    audioInventoryError = error instanceof Error ? error.message : String(error)
-  }
-}
-
-/** Cache every ayah from every listed reciter for offline playback. */
-async function downloadSelectedSurah(): Promise<void> {
-  const summary = downloadSummary
-  if (
-    summary === null ||
-    (downloadProgress !== null &&
-      downloadProgress.done < downloadProgress.total &&
-      downloadProgress.error === null)
-  )
-    return
-  if (!("caches" in globalThis)) {
-    downloadProgress = {
-      surah: summary.surah,
-      done: 0,
-      total: summary.verseCount * RECITERS.length,
-      error: "Offline downloads are not supported in this browser",
-    }
-    return
-  }
-
-  const total = summary.verseCount * RECITERS.length
-  downloadProgress = { surah: summary.surah, done: 0, total, error: null }
-  try {
-    const cache = await caches.open("qm-recitation")
-    let next = 0
-    let failure: string | null = null
-    const workers = Array.from({ length: Math.min(4, total) }, async () => {
-      while (next < total && failure === null) {
-        const taskIndex = next++
-        const reciter = RECITERS[Math.floor(taskIndex / summary.verseCount)]
-        const ayah = (taskIndex % summary.verseCount) + 1
-        if (!reciter) continue
-        try {
-          const url = ayahUrl(reciter, summary.surah, ayah)
-          if (!(await cache.match(url))) {
-            const response = await fetch(url, { mode: "cors" })
-            if (!response.ok) {
-              failure = `${reciter.label}, ayah ${ayah}: HTTP ${response.status}`
-              break
-            }
-            await cache.put(url, response.clone())
-          }
-          if (downloadProgress?.surah === summary.surah) {
-            downloadProgress = { ...downloadProgress, done: downloadProgress.done + 1 }
-          }
-        } catch (error) {
-          failure = error instanceof Error ? error.message : String(error)
-        }
-      }
-    })
-    await Promise.all(workers)
-    if (failure !== null) throw new Error(failure)
-    await refreshDownloadedAudio()
-  } catch (error) {
-    downloadProgress = {
-      surah: summary.surah,
-      done: downloadProgress?.done ?? 0,
-      total,
-      error: error instanceof Error ? error.message : String(error),
-    }
-    await refreshDownloadedAudio()
-  }
-}
-
 function playCurrentJuz(): void {
   const juzNumber = juz
   if (juzNumber === null) return
@@ -508,6 +389,7 @@ function onPagePointerUp(event: PointerEvent): void {
 }
 
 function onKeydown(event: KeyboardEvent): void {
+  if (offlineAudioOpen) return
   const target = event.target as HTMLElement | null
   if (
     target &&
@@ -548,6 +430,11 @@ function tapAyah(key: VerseKey, extend: boolean): void {
     }
   }
   select({ kind: "verse", key }, extend)
+}
+
+function openOfflineAudio(): void {
+  menuOpen = false
+  offlineAudioOpen = true
 }
 
 function cycleTheme(): void {
@@ -688,70 +575,26 @@ function cycleTheme(): void {
         </svg>
       </button>
     </div>
-    <section class="col-span-full w-full border-t border-hairline pt-3 md:col-span-2" aria-labelledby="offline-audio-title">
-      <div class="mb-2 flex items-center justify-between gap-2">
-        <h2 id="offline-audio-title" class="text-xs font-semibold uppercase tracking-wide text-ink-muted">Offline audio</h2>
-        <button
-          class="rounded-md px-2 py-1 text-xs text-ink-muted transition hover:bg-accent-soft hover:text-ink"
-          onclick={refreshDownloadedAudio}
-          aria-label="Refresh downloaded audio list"
-        >Refresh</button>
-      </div>
-      <label class="mb-2 block text-xs text-ink-muted" for="offline-audio-surah">Surah</label>
-      <div class="flex items-center gap-2">
-        <select
-          id="offline-audio-surah"
-          class="min-w-0 flex-1 rounded-lg border border-hairline bg-bg px-2.5 py-2 text-sm shadow-sm outline-none focus:border-accent"
-          bind:value={downloadSurah}
-          disabled={downloadProgress !== null && downloadProgress.done < downloadProgress.total && downloadProgress.error === null}
-          aria-label="Choose surah to download"
-        >
-          {#each surahs as surah (surah.surah)}
-            <option value={surah.surah}>{surah.surah}. {surah.name}</option>
-          {/each}
-        </select>
-        <button
-          class="shrink-0 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
-          onclick={downloadSelectedSurah}
-          disabled={downloadSummary === null || (downloadProgress !== null && downloadProgress.done < downloadProgress.total && downloadProgress.error === null)}
-        >
-          {#if currentDownload !== null && currentDownload.done < currentDownload.total && currentDownload.error === null}
-            {currentDownload.done}/{currentDownload.total}
-          {:else if currentDownload !== null && currentDownload.done === currentDownload.total && currentDownload.error === null}
-            Downloaded
-          {:else if selectedSurahDownloaded}
-            Downloaded
-          {:else}
-            Download all voices
-          {/if}
-        </button>
-      </div>
-      <p class="mt-1 text-[11px] text-ink-muted">Downloads {RECITERS.length} reciters for offline playback.</p>
-      {#if currentDownload?.error}
-        <p class="mt-2 text-xs text-red-700" role="alert">Download failed: {currentDownload.error}</p>
-      {/if}
-      <div class="mt-3 border-t border-hairline pt-2">
-        <h3 class="mb-1 text-xs font-medium text-ink">Downloaded audio</h3>
-        {#if audioInventoryError}
-          <p class="text-xs text-red-700">{audioInventoryError}</p>
-        {:else if downloadedAudio.length === 0}
-          <p class="text-xs text-ink-muted">No audio files are cached yet.</p>
-        {:else}
-          <ul class="max-h-40 space-y-2 overflow-y-auto pr-1">
-            {#each downloadedAudio as item (item.surah)}
-              {@const summary = surahs.find((surah) => surah.surah === item.surah)}
-              <li class="rounded-lg bg-bg px-2.5 py-2 text-xs">
-                <div class="font-medium text-ink">{item.surah}. {summary?.name ?? `Surah ${item.surah}`}</div>
-                {#each item.voices as voice (voice.id)}
-                  {@const reciter = RECITERS.find((entry) => entry.id === voice.id)}
-                  <div class="mt-0.5 text-ink-muted">{reciter?.label ?? voice.id}: {voice.ayahs}/{summary?.verseCount ?? "?"} ayahs</div>
-                {/each}
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </div>
-    </section>
+    <button
+      class="col-span-full flex w-full items-center gap-3 rounded-2xl border border-hairline bg-bg px-3 py-3 text-left shadow-sm transition hover:border-accent/30 hover:bg-accent-soft md:col-span-2"
+      onclick={openOfflineAudio}
+      aria-label="Open offline recitations"
+    >
+      <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 4v11"></path>
+          <path d="m7.5 10.5 4.5 4.5 4.5-4.5"></path>
+          <path d="M5 19h14"></path>
+        </svg>
+      </span>
+      <span class="min-w-0 flex-1">
+        <span class="block text-sm font-medium">Offline recitations</span>
+        <span class="block text-xs text-ink-muted">Choose a surah and the reciters to save on this device</span>
+      </span>
+      <svg class="shrink-0 text-ink-muted" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="m9 5 7 7-7 7"></path>
+      </svg>
+    </button>
     <div
       class="relative col-span-full flex w-full flex-wrap items-center justify-start gap-1.5 md:col-span-2"
     >
@@ -1009,4 +852,12 @@ function cycleTheme(): void {
     onWordBookmarks={(ranges) => (savedWordBookmarks = ranges)}
   />
   <AudioBar {player} {surahs} />
+  <OfflineAudioDialog
+    open={offlineAudioOpen}
+    {surahs}
+    initialSurah={currentSurah?.surah ?? null}
+    currentReciterId={player.reciterId}
+    repository={offlineAudio}
+    onClose={() => (offlineAudioOpen = false)}
+  />
 </div>

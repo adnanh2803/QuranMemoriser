@@ -7,6 +7,7 @@ import {
   reciterById,
   storedReciterId,
 } from "../../src/lib/features/audio/data/audio-repository"
+import { parseCachedAyah } from "../../src/lib/features/audio/data/offline-audio-repository"
 import { AudioPlayer, type AudioTrack } from "../../src/lib/features/audio/model/player.svelte"
 import {
   tracksForJuz,
@@ -14,7 +15,11 @@ import {
   tracksForSelection,
   tracksForSurah,
 } from "../../src/lib/features/audio/model/playlists"
-import type { VerseWordTimings } from "../../src/lib/features/audio/model/word-timings"
+import {
+  hasWordTimings,
+  type VerseWordTimings,
+  wordTimingsPath,
+} from "../../src/lib/features/audio/model/word-timings"
 import type {
   CommandContext,
   WordIdentity,
@@ -203,6 +208,34 @@ describe("audio urls", () => {
   it("resolves reciters by id with the default fallback", () => {
     expect(reciterById("husary").folder).toBe("Husary_64kbps")
     expect(reciterById("unknown").id).toBe("alafasy")
+  })
+})
+
+describe("offline recitations", () => {
+  it("reads an EveryAyah cache key back into a surah, reciter and ayah", () => {
+    expect(parseCachedAyah("https://everyayah.com/data/Alafasy_128kbps/002255.mp3")).toEqual({
+      surah: 2,
+      reciterId: "alafasy",
+      ayah: 255,
+    })
+  })
+
+  it("ignores cache keys that are not known recitations", () => {
+    expect(parseCachedAyah("https://everyayah.com/data/Unknown/001001.mp3")).toBeNull()
+    expect(parseCachedAyah("https://example.com/data/Alafasy_128kbps/001001.mp3")).toBeNull()
+    expect(parseCachedAyah("https://everyayah.com/data/Alafasy_128kbps/001001.ogg")).toBeNull()
+  })
+
+  it("marks the one reciter without word-level playback", () => {
+    expect(
+      RECITERS.filter((reciter) => !hasWordTimings(reciter.id)).map((item) => item.id),
+    ).toEqual(["sudais"])
+    expect(wordTimingsPath("alafasy")).toBe("/data/audio-timings/alafasy.json")
+    expect(wordTimingsPath("sudais")).toBeNull()
+  })
+
+  it("publishes a bitrate for every reciter", () => {
+    expect(RECITERS.every((reciter) => reciter.bitrateKbps >= 64)).toBe(true)
   })
 })
 

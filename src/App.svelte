@@ -3,6 +3,7 @@
   once here and handed to the reader as its environment.
 -->
 <script lang="ts">
+import { OfflineAudioRepository } from "./lib/features/audio/data/offline-audio-repository"
 import MushafReader from "./lib/features/mushaf/components/MushafReader.svelte"
 import { BookmarkRepository } from "./lib/features/mushaf/data/bookmark-repository"
 import { MushafRepository } from "./lib/features/mushaf/data/mushaf-repository"
@@ -11,6 +12,7 @@ import { SelectionEngine } from "./lib/features/mushaf/model/selection.svelte"
 
 const repository = new MushafRepository()
 const bookmarks = new BookmarkRepository()
+const offlineAudio = new OfflineAudioRepository()
 const fonts = new PageFontRegistry()
 const selection = new SelectionEngine()
 const context = repository.commandContext()
@@ -20,4 +22,4 @@ const context = repository.commandContext()
 registerStaticFonts()
 </script>
 
-<MushafReader {repository} {bookmarks} {fonts} {selection} {context} />
+<MushafReader {repository} {bookmarks} {fonts} {selection} {offlineAudio} {context} />

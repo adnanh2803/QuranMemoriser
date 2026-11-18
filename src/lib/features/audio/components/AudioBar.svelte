@@ -3,6 +3,7 @@
 import type { SurahSummary } from "../../../domain/schemas"
 import { RECITERS } from "../data/audio-repository"
 import type { AudioPlayer } from "../model/player.svelte"
+import { WORD_PLAYBACK_LABEL } from "../model/word-timings"
 
 interface Props {
   player: AudioPlayer
@@ -172,13 +173,13 @@ function formatTime(seconds: number): string {
           aria-live="polite"
         >
           {#if player.timingStatus === "loading"}
-            Loading word timings…
+            Checking {WORD_PLAYBACK_LABEL.toLowerCase()}…
           {:else if player.timingStatus === "ready"}
-            Word timings ready
+            {WORD_PLAYBACK_LABEL} ready
           {:else if player.timingStatus === "unavailable"}
-            Word timings unavailable
+            Whole ayahs only
           {:else}
-            Timing load failed
+            Word playback check failed
             <button
               class="pointer-events-auto rounded px-1 font-semibold text-accent hover:bg-accent-soft"
               onclick={() => player.reloadTimings()}
