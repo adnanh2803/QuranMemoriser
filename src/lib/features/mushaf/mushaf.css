@@ -319,8 +319,8 @@
 .surah-title__symbol {
   display: inline-flex;
   flex: 0 0 auto;
-  width: 0.82em;
-  height: 0.82em;
+  width: 0.78em;
+  height: 0.78em;
   color: color-mix(in srgb, var(--mushaf-ink) 50%, var(--page));
 }
 
@@ -351,8 +351,8 @@
 }
 
 .surah-title--compact .surah-title__symbol {
-  width: 0.62em;
-  height: 0.62em;
+  width: 0.59em;
+  height: 0.59em;
 }
 
 .m-line.m-opening .ph-surah {
