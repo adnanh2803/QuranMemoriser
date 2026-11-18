@@ -66,9 +66,19 @@ test("marks every surah opening printed on a page", async ({ page }) => {
   // running head carries only the juz and hizb, both at the page's left edge.
   const pageOne = page.locator('.sheet[data-page="1"]')
   await expect(pageOne.locator(".m-line.m-surah")).toHaveCount(1)
+  await expect(pageOne.locator(".m-line.m-surah .surah-title__frame")).toHaveCount(1)
   await expect(pageOne.locator(".sheet-head .ph-surah")).toHaveCount(0)
   await expect(pageOne.locator(".sheet-head .ph-juz")).not.toBeEmpty()
   await expect(pageOne.locator(".sheet-head .ph-hizb")).not.toBeEmpty()
+
+  // The cartouche fills the printed title line rather than growing the grid.
+  const titleLine = await pageOne.locator(".m-line.m-surah").boundingBox()
+  const titleFrame = await pageOne.locator(".m-line.m-surah .surah-title__frame").boundingBox()
+  if (!titleLine || !titleFrame) throw new Error("Page 1 surah title was not laid out")
+  expect(titleFrame.x).toBeCloseTo(titleLine.x, 0)
+  expect(titleFrame.width).toBeCloseTo(titleLine.width, 0)
+  expect(titleFrame.y).toBeGreaterThanOrEqual(titleLine.y - 1)
+  expect(titleFrame.y + titleFrame.height).toBeLessThanOrEqual(titleLine.y + titleLine.height + 1)
 
   const head = await pageOne.locator(".sheet-head").boundingBox()
   if (!head) throw new Error("Page 1 header was not laid out")
@@ -113,9 +123,19 @@ test("keeps a top-of-page surah name on the page where it begins", async ({ page
   const opening = page585.locator(".m-line.m-opening")
   await expect(opening).toHaveCount(1)
   await expect(opening.locator(".ph-surah")).not.toBeEmpty()
+  await expect(opening.locator(".surah-title--compact .surah-title__frame")).toHaveCount(1)
   await expect(opening.locator(".m-basmalah-run")).not.toBeEmpty()
   await expect(page585.locator(".sheet-head .ph-surah")).toHaveCount(0)
   await expect(page585.locator('.m-word[data-s="80"][data-a="1"]').first()).toBeVisible()
+
+  // The compact plaque sits above the basmalah without pushing either out of
+  // the single printed line.
+  const plaque = await opening.locator(".surah-title").boundingBox()
+  const basmalah = await opening.locator(".m-basmalah-run").boundingBox()
+  const openingLine = await opening.boundingBox()
+  if (!plaque || !basmalah || !openingLine) throw new Error("Page 585 opening was not laid out")
+  expect(plaque.y + plaque.height).toBeLessThanOrEqual(basmalah.y + 0.5)
+  expect(basmalah.y + basmalah.height).toBeLessThanOrEqual(openingLine.y + openingLine.height + 0.5)
 })
 
 test("marks a start, completes the range on the second tap", async ({ page }) => {

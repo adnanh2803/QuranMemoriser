@@ -293,34 +293,52 @@
 
 /* --- ornamental lines ----------------------------------------------------- */
 
-/* A surah's opening line is its calligraphic name between two hairlines
-   that fade toward the margins. */
+/* A surah's opening line carries its calligraphic name in an ornamental
+   cartouche drawn by SurahTitle. */
 .m-line.m-surah {
   align-items: center;
   justify-content: center;
-  gap: clamp(0.5em, 2.5cqw, 1.1em);
 }
 
-.m-line.m-surah::before,
-.m-line.m-surah::after {
-  width: clamp(1.5em, 8cqw, 3.5em);
-  height: 1px;
-  background: color-mix(in srgb, var(--mushaf-ink) 45%, transparent);
-  content: "";
+.surah-title {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  color: var(--mushaf-ink);
 }
 
-.m-line.m-surah::before {
-  -webkit-mask-image: linear-gradient(to right, #000, transparent);
-  mask-image: linear-gradient(to right, #000, transparent);
+.m-line.m-surah .surah-title {
+  display: flex;
+  width: 100%;
+  height: 100%;
 }
 
-.m-line.m-surah::after {
-  -webkit-mask-image: linear-gradient(to left, #000, transparent);
-  mask-image: linear-gradient(to left, #000, transparent);
+/* The frame is a picture, not a target: the name stays centred above it. */
+.surah-title__frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* The frame is stretched to the printed line's width; keep its hairlines
+   even instead of letting the non-uniform scale thicken one axis. */
+.surah-title__frame :is(path, circle) {
+  vector-effect: non-scaling-stroke;
+}
+
+.surah-title .ph-surah {
+  position: relative;
+  z-index: 1;
 }
 
 /* A surah that begins at the top of a page: the print has only a basmalah
-   line there, so the name shares it, set above the basmalah. */
+   line there, so the name shares it, set above the basmalah. The plaque keeps
+   the decal's compact proportions. */
 .m-line.m-opening {
   flex-direction: column;
   align-items: center;
@@ -329,10 +347,16 @@
   line-height: 1;
 }
 
+.surah-title--compact {
+  width: max-content;
+  max-width: 100%;
+  padding: 0.13em 1.25em 0.15em;
+}
+
 .m-line.m-opening .ph-surah {
-  font-size: 1.15em;
-  line-height: 1.05;
-  transform: scaleX(1.08);
+  font-size: 1.02em;
+  line-height: 1;
+  transform: scaleX(1.04);
 }
 
 .m-line.m-basmalah {

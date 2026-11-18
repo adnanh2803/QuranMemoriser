@@ -22,7 +22,7 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
   } from "../model/selection.svelte"
   import type { WordLedger } from "../model/word-ledger"
   import { settleLines } from "../model/settle"
-  import { surahNameGlyph } from "../model/surah-names"
+  import SurahTitle from "./SurahTitle.svelte"
 
   interface Props {
     page: number
@@ -432,13 +432,13 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
           <!-- Every surah the page opens gets its name; a mid-page opening is
                marked only here, since the running head carries no surah. -->
           <div class="m-line m-surah">
-            <span class="ph-surah">{surahNameGlyph(line.surah)}</span>
+            <SurahTitle surah={line.surah} />
           </div>
         {:else if line.kind === "opening"}
           <!-- A surah whose basmalah fills the page's first line: its name
                sits on the page where it begins, above the basmalah. -->
           <div class="m-line m-opening">
-            <span class="ph-surah">{surahNameGlyph(line.surah)}</span>
+            <SurahTitle surah={line.surah} compact />
             <span class="m-basmalah-run">{line.glyphs.split("|").join(" ")}</span>
           </div>
         {:else if line.kind === "basmalah"}
