@@ -27,7 +27,7 @@ let { surah, revelation, compact = false }: Props = $props()
   </span>
 {/snippet}
 
-<!-- The surah name, made a little heavier and flanked by a symbol for its
+<!-- The surah name, made a little heavier, with a small symbol marking its
      place of revelation. No cartouche: the printed line is the only frame. -->
 <span
   class="surah-title"
@@ -36,5 +36,4 @@ let { surah, revelation, compact = false }: Props = $props()
 >
   {@render symbol()}
   <span class="ph-surah">{surahNameGlyph(surah)}</span>
-  {@render symbol()}
 </span>

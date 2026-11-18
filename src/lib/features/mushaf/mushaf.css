@@ -293,7 +293,7 @@
 
 /* --- surah openings ------------------------------------------------------- */
 
-/* A surah's opening line carries its calligraphic name, flanked by a simple
+/* A surah's opening line carries its calligraphic name, marked by a small
    symbol for the place it was revealed. */
 .m-line.m-surah {
   align-items: center;
@@ -314,13 +314,14 @@
   height: 100%;
 }
 
-/* The symbols are drawn in the page ink, a touch lighter than the name. */
+/* The symbol is a quiet mark, blended toward the paper and smaller than the
+   name so it labels without competing with it. */
 .surah-title__symbol {
   display: inline-flex;
   flex: 0 0 auto;
-  width: 1.15em;
-  height: 1.15em;
-  color: color-mix(in srgb, var(--mushaf-ink) 76%, var(--accent));
+  width: 0.82em;
+  height: 0.82em;
+  color: color-mix(in srgb, var(--mushaf-ink) 50%, var(--page));
 }
 
 .surah-title__symbol svg {
@@ -350,8 +351,8 @@
 }
 
 .surah-title--compact .surah-title__symbol {
-  width: 0.92em;
-  height: 0.92em;
+  width: 0.62em;
+  height: 0.62em;
 }
 
 .m-line.m-opening .ph-surah {

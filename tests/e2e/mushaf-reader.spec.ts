@@ -68,8 +68,8 @@ test("marks every surah opening printed on a page", async ({ page }) => {
   const pageOneTitle = pageOne.locator(".m-line.m-surah .surah-title")
   await expect(pageOne.locator(".m-line.m-surah")).toHaveCount(1)
   await expect(pageOneTitle).toHaveAttribute("data-revelation", "makkah")
-  await expect(pageOneTitle.locator(".surah-title__symbol")).toHaveCount(2)
-  await expect(pageOneTitle.locator('.surah-title__symbol svg[data-icon="kaaba"]')).toHaveCount(2)
+  await expect(pageOneTitle.locator(".surah-title__symbol")).toHaveCount(1)
+  await expect(pageOneTitle.locator('.surah-title__symbol svg[data-icon="kaaba"]')).toHaveCount(1)
   await expect(pageOneTitle.locator(".surah-title__frame")).toHaveCount(0)
   await expect(pageOne.locator(".sheet-head .ph-surah")).toHaveCount(0)
   await expect(pageOne.locator(".sheet-head .ph-juz")).not.toBeEmpty()
@@ -101,8 +101,8 @@ test("marks every surah opening printed on a page", async ({ page }) => {
   await page.waitForSelector('.sheet[data-page="2"] .mushaf.ready', { timeout: 20000 })
   const pageTwoTitle = page.locator('.sheet[data-page="2"] .m-line.m-surah .surah-title')
   await expect(pageTwoTitle).toHaveAttribute("data-revelation", "madinah")
-  await expect(pageTwoTitle.locator(".surah-title__symbol")).toHaveCount(2)
-  await expect(pageTwoTitle.locator('.surah-title__symbol svg[data-icon="mosque"]')).toHaveCount(2)
+  await expect(pageTwoTitle.locator(".surah-title__symbol")).toHaveCount(1)
+  await expect(pageTwoTitle.locator('.surah-title__symbol svg[data-icon="mosque"]')).toHaveCount(1)
 
   // The last page opens three surahs, each with its name in the line grid.
   await page.getByRole("button", { name: "Show controls" }).click()
@@ -142,7 +142,7 @@ test("keeps a top-of-page surah name on the page where it begins", async ({ page
     "data-revelation",
     "makkah",
   )
-  await expect(opening.locator(".surah-title--compact .surah-title__symbol")).toHaveCount(2)
+  await expect(opening.locator(".surah-title--compact .surah-title__symbol")).toHaveCount(1)
   await expect(opening.locator(".surah-title__frame")).toHaveCount(0)
   await expect(opening.locator(".m-basmalah-run")).not.toBeEmpty()
   await expect(page585.locator(".sheet-head .ph-surah")).toHaveCount(0)
