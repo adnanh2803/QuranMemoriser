@@ -174,7 +174,7 @@ function bookmarkSelected(): void {
 
 {#if count > 0 || pending}
   <div
-    class="pointer-events-none fixed {raised ? 'bottom-[20rem]' : 'bottom-6'} left-2 right-2 z-20 flex max-w-[calc(100vw-1rem)] flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-hairline/60 bg-surface-raised/70 px-3 py-2 shadow-md backdrop-blur-sm sm:right-auto sm:left-1/2 sm:w-max sm:-translate-x-1/2 sm:flex-nowrap sm:gap-2 sm:rounded-full sm:pr-2 sm:pl-4 [@media(max-height:40rem)]:top-2 [@media(max-height:40rem)]:bottom-auto"
+    class="pointer-events-none fixed {raised ? 'bottom-[20rem]' : 'bottom-6'} left-2 right-2 z-20 flex max-w-[calc(100vw-1rem)] flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-hairline/60 bg-surface-raised/70 px-3 py-2 shadow-md backdrop-blur-sm sm:right-auto sm:left-1/2 sm:w-max sm:-translate-x-1/2 sm:flex-nowrap sm:gap-2 sm:rounded-full sm:pr-2 sm:pl-4"
     role="status"
   >
     {#if pending}
@@ -240,7 +240,7 @@ function bookmarkSelected(): void {
 
 {#if copied !== null}
   <div
-    class="fixed {raised ? 'bottom-[24rem]' : 'bottom-22'} left-2 right-2 z-20 mx-auto w-fit max-w-[calc(100vw-1rem)] rounded-full border border-hairline bg-surface px-4 py-2 text-center text-xs text-ink shadow-md sm:right-auto sm:left-1/2 sm:-translate-x-1/2 [@media(max-height:40rem)]:top-14 [@media(max-height:40rem)]:bottom-auto"
+    class="fixed {raised ? 'bottom-[24rem]' : 'bottom-22'} left-2 right-2 z-20 mx-auto w-fit max-w-[calc(100vw-1rem)] rounded-full border border-hairline bg-surface px-4 py-2 text-center text-xs text-ink shadow-md sm:right-auto sm:left-1/2 sm:-translate-x-1/2"
   >
     {copied}
   </div>

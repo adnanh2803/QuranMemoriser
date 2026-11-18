@@ -226,3 +226,18 @@ test("marks a start, completes the range on the second tap", async ({ page }) =>
   await page.keyboard.up("Shift")
   await expect(page.getByRole("status")).toContainText("3 verses selected")
 })
+
+test("keeps the selection dock at the bottom of a short window", async ({ page }) => {
+  const height = 600
+  await page.setViewportSize({ width: 900, height })
+  await page.goto("/", { waitUntil: "domcontentloaded" })
+
+  await page.locator('.m-word[data-s="1"][data-a="1"]').nth(1).click()
+  const dock = page.getByRole("status")
+  await expect(dock).toBeVisible()
+  const box = await dock.boundingBox()
+  expect(box).not.toBeNull()
+  if (!box) throw new Error("Selection dock was not laid out")
+  expect(box.y).toBeGreaterThan(height / 2)
+  expect(box.y + box.height).toBeLessThanOrEqual(height)
+})
