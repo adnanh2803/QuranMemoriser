@@ -9,6 +9,7 @@ import { BookmarkRepository } from "./lib/features/mushaf/data/bookmark-reposito
 import { MushafRepository } from "./lib/features/mushaf/data/mushaf-repository"
 import { PageFontRegistry, registerStaticFonts } from "./lib/features/mushaf/data/page-fonts"
 import { SelectionEngine } from "./lib/features/mushaf/model/selection.svelte"
+import UpdateBanner from "./lib/pwa/UpdateBanner.svelte"
 
 const repository = new MushafRepository()
 const bookmarks = new BookmarkRepository()
@@ -23,3 +24,4 @@ registerStaticFonts()
 </script>
 
 <MushafReader {repository} {bookmarks} {fonts} {selection} {offlineAudio} {context} />
+<UpdateBanner />
