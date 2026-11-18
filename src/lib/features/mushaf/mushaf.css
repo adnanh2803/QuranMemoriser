@@ -76,15 +76,16 @@
   }
 }
 
-/* --- running head: juz, surah, folio ------------------------------------ */
+/* --- running head: juz and hizb ----------------------------------------- */
 
 .sheet-head {
   direction: rtl;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
   align-items: center;
-  gap: 10px;
-  padding-inline: clamp(3rem, 5vw, 4rem);
+  /* The labels sit together at the physical left edge of the page. */
+  justify-content: flex-end;
+  gap: clamp(0.5rem, 2vw, 1.25rem);
+  padding-inline: 0;
   margin-bottom: 8px;
   flex: 0 0 auto;
   font-family: var(--font-sans);
@@ -99,12 +100,7 @@
   color: var(--accent);
 }
 
-.ph-juz {
-  justify-self: start;
-}
-
 .ph-hizb {
-  justify-self: end;
   font-variant-numeric: tabular-nums;
 }
 
@@ -297,8 +293,8 @@
 
 /* --- ornamental lines ----------------------------------------------------- */
 
-/* A surah's opening line is its calligraphic name, set in the running head's
-   face between two hairlines that fade toward the margins. */
+/* A surah's opening line is its calligraphic name between two hairlines
+   that fade toward the margins. */
 .m-line.m-surah {
   align-items: center;
   justify-content: center;
@@ -321,6 +317,22 @@
 .m-line.m-surah::after {
   -webkit-mask-image: linear-gradient(to left, #000, transparent);
   mask-image: linear-gradient(to left, #000, transparent);
+}
+
+/* A surah that begins at the top of a page: the print has only a basmalah
+   line there, so the name shares it, set above the basmalah. */
+.m-line.m-opening {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  line-height: 1;
+}
+
+.m-line.m-opening .ph-surah {
+  font-size: 1.15em;
+  line-height: 1.05;
+  transform: scaleX(1.08);
 }
 
 .m-line.m-basmalah {
@@ -351,6 +363,12 @@
      box. The box is centred, but its ink sits half that overhang too far
      left; nudge the run back to its optical centre. */
   transform: translateX(0.75em);
+}
+
+/* A shared opening line keeps the basmalah smaller than the standalone band. */
+.m-line.m-opening .m-basmalah-run {
+  font-size: 0.56em;
+  line-height: 1;
 }
 
 /* --- folio ---------------------------------------------------------------- */

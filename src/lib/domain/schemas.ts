@@ -202,14 +202,39 @@ export const mushafBasmalahLineSchema = z.object({
 export type MushafBasmalahLine = z.infer<typeof mushafBasmalahLineSchema>
 
 /**
+ * A surah opening at the very top of a page: the print puts the name band at
+ * the foot of the previous page and the basmalah on this page's first line.
+ * The app keeps the name on the page where the surah begins, so both share
+ * the first line.
+ */
+export const mushafOpeningLineSchema = z.object({
+  kind: z.literal("opening"),
+  line: lineSlotSchema,
+  surah: surahNumberSchema,
+  /** Pipe-delimited QCF v1 slots of the basmalah. */
+  glyphs: z.string().min(1),
+})
+export type MushafOpeningLine = z.infer<typeof mushafOpeningLineSchema>
+
+/** A spacer left at the foot of the page before a surah opening. */
+export const mushafBlankLineSchema = z.object({
+  kind: z.literal("blank"),
+  line: lineSlotSchema,
+})
+export type MushafBlankLine = z.infer<typeof mushafBlankLineSchema>
+
+/**
  * One line slot of a mushaf page. The Madinah mushaf is a strict 15-line
- * grid: every line is ayah words, a surah header or a basmalah. Only the
- * front-matter pages 1 and 2 use fewer (8) lines.
+ * grid: every line is ayah words, a surah header or basmalah, a combined
+ * opening, or the blank that follows a name band moved to the next page.
+ * Only the front-matter pages 1 and 2 use fewer (8) lines.
  */
 export const mushafLineSchema = z.discriminatedUnion("kind", [
   mushafWordsLineSchema,
   mushafSurahLineSchema,
   mushafBasmalahLineSchema,
+  mushafOpeningLineSchema,
+  mushafBlankLineSchema,
 ])
 export type MushafLine = z.infer<typeof mushafLineSchema>
 

@@ -62,19 +62,60 @@ test("marks every surah opening printed on a page", async ({ page }) => {
   await page.goto("/", { waitUntil: "domcontentloaded" })
   await page.waitForSelector('.sheet[data-page="1"] .mushaf.ready', { timeout: 20000 })
 
-  // Page 1 opens Al-Fatiha under the running head's calligraphic name.
+  // Page 1 opens Al-Fatiha with its calligraphic name in the line grid. The
+  // running head carries only the juz and hizb, both at the page's left edge.
   const pageOne = page.locator('.sheet[data-page="1"]')
   await expect(pageOne.locator(".m-line.m-surah")).toHaveCount(1)
-  await expect(pageOne.locator(".sheet-head .ph-surah")).not.toBeEmpty()
+  await expect(pageOne.locator(".sheet-head .ph-surah")).toHaveCount(0)
+  await expect(pageOne.locator(".sheet-head .ph-juz")).not.toBeEmpty()
+  await expect(pageOne.locator(".sheet-head .ph-hizb")).not.toBeEmpty()
 
-  // The last page opens three surahs; only the first is named above the page,
-  // so the other two must keep their names in the line grid.
+  const head = await pageOne.locator(".sheet-head").boundingBox()
+  if (!head) throw new Error("Page 1 header was not laid out")
+  for (const label of [".ph-juz", ".ph-hizb"]) {
+    const box = await pageOne.locator(`.sheet-head ${label}`).boundingBox()
+    if (!box) throw new Error(`Page 1 ${label} was not laid out`)
+    expect(box.x + box.width).toBeLessThanOrEqual(head.x + head.width / 2)
+  }
+
+  // The last page opens three surahs, each with its name in the line grid.
   await page.getByRole("button", { name: "Show controls" }).click()
   const pageInput = page.getByLabel("Go to page")
   await pageInput.fill("604")
   await pageInput.press("Enter")
   await page.waitForSelector('.sheet[data-page="604"] .mushaf.ready', { timeout: 20000 })
   await expect(page.locator('.sheet[data-page="604"] .m-line.m-surah')).toHaveCount(3)
+})
+
+test("keeps a top-of-page surah name on the page where it begins", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" })
+  await page.getByRole("button", { name: "Show controls" }).click()
+  const pageInput = page.getByLabel("Go to page")
+
+  // Page 584 ends with 79:46; the print puts Surah Abasa's name band at its
+  // foot. The app leaves that slot blank instead.
+  await pageInput.fill("584")
+  await pageInput.press("Enter")
+  await page.waitForSelector('.sheet[data-page="584"] .mushaf.ready', { timeout: 20000 })
+  const page584 = page.locator('.sheet[data-page="584"]')
+  await expect(page584.locator(".m-line.m-surah")).toHaveCount(0)
+  await expect(page584.locator(".m-line.m-opening")).toHaveCount(0)
+  await expect(page584.locator(".m-line.m-blank")).toHaveCount(1)
+  await expect(page584.locator('.m-word[data-s="80"]')).toHaveCount(0)
+
+  // Page 585 opens Abasa: its name and basmalah share the first line, and the
+  // running head no longer repeats the surah name.
+  await page.getByRole("button", { name: "Show controls" }).click()
+  await pageInput.fill("585")
+  await pageInput.press("Enter")
+  await page.waitForSelector('.sheet[data-page="585"] .mushaf.ready', { timeout: 20000 })
+  const page585 = page.locator('.sheet[data-page="585"]')
+  const opening = page585.locator(".m-line.m-opening")
+  await expect(opening).toHaveCount(1)
+  await expect(opening.locator(".ph-surah")).not.toBeEmpty()
+  await expect(opening.locator(".m-basmalah-run")).not.toBeEmpty()
+  await expect(page585.locator(".sheet-head .ph-surah")).toHaveCount(0)
+  await expect(page585.locator('.m-word[data-s="80"][data-a="1"]').first()).toBeVisible()
 })
 
 test("marks a start, completes the range on the second tap", async ({ page }) => {

@@ -51,17 +51,6 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
   let longPressOrigin: { x: number; y: number } | null = null
   let longPressFired = false
 
-  /** The surah the running head names: the one at the top of the page. */
-  const headSurah = $derived.by(() => {
-    if (!chunk) return null
-    for (const line of chunk.lines) {
-      if (line.kind === "surah") return line.surah
-      // A basmalah precedes the surah's first words; keep looking.
-      if (line.kind === "words") return line.words[0]?.s ?? null
-    }
-    return null
-  })
-
   $effect(() => {
     // Track the chunk; an empty shell stays empty.
     if (!chunk) {
@@ -420,16 +409,9 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
   <header class="sheet-head">
     {#if juz !== null}
       <span class="ph-label ph-juz">جزء {arabicNumber.format(juz)}</span>
-    {:else}
-      <span class="ph-label ph-juz"></span>
-    {/if}
-    {#if headSurah !== null}
-      <span class="ph-surah">{surahNameGlyph(headSurah)}</span>
     {/if}
     {#if hizb !== null}
       <span class="ph-label ph-hizb">حزب {arabicNumber.format(hizb)}</span>
-    {:else}
-      <span class="ph-label ph-hizb"></span>
     {/if}
   </header>
 
@@ -448,14 +430,24 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
       {#each chunk.lines as line, lineIndex (line.line)}
         {#if line.kind === "surah"}
           <!-- Every surah the page opens gets its name; a mid-page opening is
-               marked only here, since the running head names the top surah. -->
+               marked only here, since the running head carries no surah. -->
           <div class="m-line m-surah">
             <span class="ph-surah">{surahNameGlyph(line.surah)}</span>
+          </div>
+        {:else if line.kind === "opening"}
+          <!-- A surah whose basmalah fills the page's first line: its name
+               sits on the page where it begins, above the basmalah. -->
+          <div class="m-line m-opening">
+            <span class="ph-surah">{surahNameGlyph(line.surah)}</span>
+            <span class="m-basmalah-run">{line.glyphs.split("|").join(" ")}</span>
           </div>
         {:else if line.kind === "basmalah"}
           <div class="m-line m-basmalah">
             <span class="m-basmalah-run">{line.glyphs.split("|").join(" ")}</span>
           </div>
+        {:else if line.kind === "blank"}
+          <!-- A spacer where the print put the next surah's name band. -->
+          <div class="m-line m-blank"></div>
         {:else}
           <!-- A printed line of words; only the words themselves are targets. -->
           <div class="m-line m-ayah">

@@ -1,33 +1,30 @@
 /**
  * Builds the app-consumed Quran data files from the fetched sources.
  *
- * Data model (established during pipeline bring-up):
- *  - The QUL-derived mushaf layout is the print truth: 604 pages, each a
- *    strict sequence of line items (ayah word lines, surah header bands,
- *    basmalah lines) carrying QCF v1 glyph slots exactly as printed.
- *  - A layout-driven walk (`scripts/lib/walk.ts`) assigns every slot to its
- *    ayah against the per-ayah reference streams of `mushaf.txt`. Three
- *    documented reference defects are tolerated (ledger below).
+ * Data model:
+ *  - The QCF v1 page fonts are page-specific: a word's glyph code renders
+ *    only in the font of the page it was printed on.  The Quran.com v4 API
+ *    supplies that print layout (per-word `page_number` and `line_number`),
+ *    and `scripts/lib/page-layout.ts` turns it into the 604 page chunks.
+ *  - The QUL layout file is an independent 15-line edition and is only used
+ *    for the shared basmalah band and the type-scale/fit metadata.  Its page
+ *    breaks drift from the QCF fonts in several places, so it is not used to
+ *    place words on pages.
  *  - Verse metadata (names, juz, hizb, ruku, manzil, sajdah, Uthmani text)
- *    comes from the Quran.com v4 API. Pages come from the walk, i.e. from
- *    the print — the API's own page numbers disagree with the print on 57
- *    ayahs and are never used for rendering.
+ *    comes from the Quran.com v4 API.
  *
  * Cross-checks before anything is written; each runs against a fixed
  * documented ledger, and anything beyond it fails the build:
- *  1. layout glyph stream ≡ reference streams
- *  2. API glyph streams ≡ reference streams (space-stripped)
- *  3. reference page column ≡ API page_number
- *  4. layout-derived start pages vs reference page column (known ±1 drift)
- *  5. verse keys strictly consecutive (1:1 .. 114:6)
- *  6. 114 surah headers, 112 basmalahs, 18 headers on the page before
- *     their surah's first ayah (page-top starts)
- *  7. chunk structure: 15 lines per page (8 on pages 1–2), one end slot
- *     per ayah, monotonic start pages
+ *  1. API glyph streams ≡ reference streams (space-stripped)
+ *  2. reference page column ≡ API page_number
+ *  3. verse keys strictly consecutive (1:1 .. 114:6)
+ *  4. 604 page chunks, exact line grids, every API word placed once
+ *  5. 114 surah headers, 112 basmalahs, valid placement
+ *  6. one verse-end medallion per ayah
  *
  * Outputs:
- *  - public/data/surahs.json      (114 surah summaries, print pages)
- *  - public/data/ayahs.json       (6236 ayah metadata rows, print pages)
+ *  - public/data/surahs.json      (114 surah summaries, API pages)
+ *  - public/data/ayahs.json       (6236 ayah metadata rows, API pages)
  *  - public/data/pages/pNNN.json  (604 page layout chunks)
  *  - public/data/word-index.json  (slot indexes within verses, verse totals)
  *  - public/data/audio-timings/  (word timing maps for matching reciters)
@@ -57,13 +54,7 @@ import {
   wordIndexFileSchema,
 } from "../src/lib/domain/schemas.ts"
 import { buildWordIndex } from "../src/lib/features/mushaf/model/word-ledger.ts"
-import {
-  buildPageChunk,
-  flattenLayout,
-  type MushafLayout,
-  SHORT_LINES_PAGES,
-} from "./lib/layout.ts"
-import { type WalkResult, walkSlots } from "./lib/walk.ts"
+import { buildPageLayout, checkPageLayout, lineCountOf } from "./lib/page-layout.ts"
 
 const ROOT = path.resolve(import.meta.dirname, "..")
 const CACHE = path.join(ROOT, ".cache", "sources")
@@ -78,7 +69,7 @@ export interface Sources {
   verses: ApiVerse[]
   /** `mushaf.txt` rows: { page, glyphs } per ayah, reading order. */
   glyphTable: { page: number; glyphs: string }[]
-  /** The QUL-derived mushaf layout file (print truth). */
+  /** The QUL layout file, used for the basmalah band and type-scale fit. */
   layout: MushafLayoutFile
 }
 
@@ -143,29 +134,11 @@ export function ayahIndexOf(chapters: ApiChapter[], surah: number, ayah: number)
 /* Documented anomaly ledgers                                          */
 /* ------------------------------------------------------------------ */
 
-/**
- * Reference-stream defects tolerated by the layout walk, keyed
- * `kind:ayah` (1-based ayah index). If the walk ever reports something
- * outside this ledger the build fails; investigate the new anomaly and
- * either fix the source or add it here deliberately.
- */
-const DOCUMENTED_STREAM_ANOMALIES: ReadonlySet<string> = new Set([
-  "reference-extra:86", // 2:79 — table doubles a glyph inside the ayah
-  "substitution:5313", // 68:42 — table's final char is a corrupt non-glyph
-  "reference-extra:5331", // 69:8 — table carries a trailing extra glyph
-])
-
 /** Ayahs where the API glyph stream differs from the reference table. */
 const DOCUMENTED_TABLE_GLYPH_DIFFS: ReadonlySet<string> = new Set(["2:79", "68:42", "69:8"])
 
 /** Ayahs where the table's page column differs from the API page number. */
 const DOCUMENTED_TABLE_PAGE_DIFFS: ReadonlySet<string> = new Set(["83:35"])
-
-/** Layout-derived start pages disagreeing with the reference page column. */
-const DOCUMENTED_START_PAGE_DIFF_COUNT = 57
-
-/** Surah headers printed on the page before their surah's first ayah. */
-const DOCUMENTED_SHIFTED_HEADERS = 18
 
 /* ------------------------------------------------------------------ */
 /* Cross-checks                                                        */
@@ -253,154 +226,10 @@ export function checkGlyphTable(sources: Sources): CheckResult {
   return { name: "glyph table", failures }
 }
 
-/** The layout walk against its documented anomaly ledger and invariants. */
-export function checkLayoutWalk(walk: WalkResult, ayahKeys: string[]): CheckResult {
-  const failures: string[] = []
-
-  const observed = new Set(walk.anomalies.map((anomaly) => `${anomaly.kind}:${anomaly.ayah}`))
-  for (const anomaly of walk.anomalies) {
-    const key = `${anomaly.kind}:${anomaly.ayah}`
-    if (!DOCUMENTED_STREAM_ANOMALIES.has(key)) {
-      failures.push(`undocumented stream anomaly ${key} on p${anomaly.page}: ${anomaly.detail}`)
-    }
-  }
-  for (const key of DOCUMENTED_STREAM_ANOMALIES) {
-    if (!observed.has(key)) failures.push(`documented stream anomaly ${key} did not occur`)
-  }
-
-  const covered = new Set(walk.slotAyah)
-  if (covered.size !== ayahKeys.length) {
-    failures.push(`walk covered ${covered.size} of ${ayahKeys.length} ayahs`)
-  }
-
-  let previousPage = 0
-  walk.ayahStartPage.forEach((page, index) => {
-    if (page === 0) failures.push(`${ayahKeys[index]}: no layout glyph ever matched`)
-    if (page < previousPage) {
-      failures.push(`${ayahKeys[index]}: start page ${page} goes backwards`)
-    }
-    previousPage = page
-  })
-  walk.ayahEndPage.forEach((page, index) => {
-    if (page === 0) failures.push(`${ayahKeys[index]}: no end slot found`)
-  })
-
-  const endSlots = walk.slotEnd.filter(Boolean).length
-  if (endSlots !== ayahKeys.length) {
-    failures.push(`${endSlots} end slots, expected ${ayahKeys.length}`)
-  }
-
-  return { name: "layout walk", failures }
-}
-
-/**
- * Layout-derived start pages against the reference page column. The two
- * sources disagree on exactly DOCUMENTED_START_PAGE_DIFF_COUNT ayahs, each
- * by exactly one page; the layout (print truth) wins.
- */
-export function checkStartPages(
-  walk: WalkResult,
-  sources: Sources,
-  ayahKeys: string[],
-): CheckResult {
-  const failures: string[] = []
-  const diffs: { key: string; layout: number; reference: number }[] = []
-  for (let index = 0; index < ayahKeys.length; index++) {
-    const layout = walk.ayahStartPage[index]
-    const reference = sources.glyphTable[index]?.page
-    const key = ayahKeys[index]
-    if (layout === undefined || reference === undefined || key === undefined) {
-      failures.push(`index ${index}: missing walk page, table row or verse key`)
-      continue
-    }
-    if (layout !== reference) diffs.push({ key, layout, reference })
-  }
-  if (diffs.length !== DOCUMENTED_START_PAGE_DIFF_COUNT) {
-    failures.push(
-      `${diffs.length} start-page diffs vs the reference table, expected ${DOCUMENTED_START_PAGE_DIFF_COUNT}`,
-    )
-  }
-  for (const diff of diffs) {
-    if (Math.abs(diff.layout - diff.reference) !== 1) {
-      failures.push(
-        `${diff.key}: layout page ${diff.layout} vs reference page ${diff.reference} — not the documented ±1 drift`,
-      )
-    }
-  }
-  return { name: "start pages", failures }
-}
-
-/**
- * Surah header/basmalah structure of the layout: one header per surah in
- * order, one basmalah per surah except 1 and 9, and exactly the documented
- * number of headers printed on the page before their surah's first ayah
- * (always on that page's last line).
- */
-export function checkSurahHeaders(
-  layout: MushafLayout,
-  walk: WalkResult,
-  sources: Sources,
-): CheckResult {
-  const failures: string[] = []
-
-  const headers: { page: number; line: number; surah: number }[] = []
-  let basmalahCount = 0
-  for (const layoutPage of layout.pages) {
-    for (const layoutLine of layoutPage.lines) {
-      if (layoutLine.kind === "surah") {
-        headers.push({ page: layoutPage.page, line: layoutLine.line, surah: layoutLine.surah })
-      } else if (layoutLine.kind === "basmalah") {
-        basmalahCount++
-      }
-    }
-  }
-
-  if (headers.length !== 114) failures.push(`${headers.length} surah headers, expected 114`)
-  headers.forEach((header, index) => {
-    if (header.surah !== index + 1) {
-      failures.push(`header ${index + 1} belongs to surah ${header.surah}`)
-    }
-  })
-  if (basmalahCount !== 112) failures.push(`${basmalahCount} basmalah lines, expected 112`)
-
-  let shifted = 0
-  for (const header of headers) {
-    const firstAyahPage = walk.ayahStartPage[ayahIndexOf(sources.chapters, header.surah, 1)]
-    if (firstAyahPage === undefined || firstAyahPage === 0) {
-      failures.push(`s${header.surah}: first ayah has no layout start page`)
-      continue
-    }
-    if (header.page === firstAyahPage) continue
-    shifted++
-    if (header.page !== firstAyahPage - 1) {
-      failures.push(
-        `s${header.surah}: header on p${header.page} but first ayah starts on p${firstAyahPage}`,
-      )
-    }
-    if (header.line !== 15) {
-      failures.push(
-        `s${header.surah}: shifted header sits on line ${header.line}, expected the page's last line`,
-      )
-    }
-  }
-  if (shifted !== DOCUMENTED_SHIFTED_HEADERS) {
-    failures.push(
-      `${shifted} headers on the page before their surah, expected ${DOCUMENTED_SHIFTED_HEADERS}`,
-    )
-  }
-
-  if (failures.length === 0) {
-    console.log(
-      `surah headers check: 114 headers, 112 basmalahs, ${shifted} page-top starts (header on the previous page's last line) ✓`,
-    )
-  }
-  return { name: "surah headers", failures }
-}
-
 /** Structural invariants of one built page chunk. */
 export function checkChunk(chunk: PageChunk): string[] {
   const failures: string[] = []
-  const expectedLines = SHORT_LINES_PAGES.get(chunk.page) ?? 15
+  const expectedLines = lineCountOf(chunk.page)
   if (chunk.lines.length !== expectedLines) {
     failures.push(`p${chunk.page}: ${chunk.lines.length} lines, expected ${expectedLines}`)
   }
@@ -416,18 +245,15 @@ export function checkChunk(chunk: PageChunk): string[] {
 /* Output builders                                                     */
 /* ------------------------------------------------------------------ */
 
-export function buildAyahs(sources: Sources, walk: WalkResult, ayahKeys: string[]): AyahMeta[] {
-  return sources.verses.map((verse, index) => {
-    const parsed = parseVerseKey(ayahKeys[index] ?? "")
-    const page = walk.ayahStartPage[index]
-    if (!parsed || page === undefined || page === 0) {
-      throw new Error(`verse ${index + 1}: missing verse key or layout start page`)
-    }
+export function buildAyahs(sources: Sources): AyahMeta[] {
+  return sources.verses.map((verse) => {
+    const parsed = parseVerseKey(verse.verse_key)
+    if (!parsed) throw new Error(`malformed verse key: ${verse.verse_key}`)
     const [surah, ayah] = parsed
     return {
       surah,
       ayah,
-      page,
+      page: verse.page_number,
       juz: verse.juz_number,
       hizb: verse.hizb_number,
       rubElHizb: verse.rub_el_hizb_number,
@@ -439,14 +265,14 @@ export function buildAyahs(sources: Sources, walk: WalkResult, ayahKeys: string[
   })
 }
 
-export function buildSurahs(sources: Sources, walk: WalkResult): SurahSummary[] {
+export function buildSurahs(sources: Sources): SurahSummary[] {
   return sources.chapters.map((chapter) => {
     const firstIndex = ayahIndexOf(sources.chapters, chapter.id, 1)
     const lastIndex = ayahIndexOf(sources.chapters, chapter.id, chapter.verses_count)
-    const firstPage = walk.ayahStartPage[firstIndex]
-    const lastPage = walk.ayahEndPage[lastIndex]
-    if (firstPage === undefined || firstPage === 0 || lastPage === undefined || lastPage === 0) {
-      throw new Error(`surah ${chapter.id}: missing layout page edges`)
+    const firstPage = sources.verses[firstIndex]?.page_number
+    const lastPage = sources.verses[lastIndex]?.page_number
+    if (firstPage === undefined || lastPage === undefined) {
+      throw new Error(`surah ${chapter.id}: missing page edges`)
     }
     return {
       surah: chapter.id,
@@ -581,42 +407,20 @@ async function main(): Promise<void> {
   const glyphCheck = checkGlyphTable(sources)
   problems.push(...glyphCheck.failures.slice(0, 10))
 
-  // --- layout walk ---
-  console.log("walking the layout glyph stream…")
-  const mushafLayout = flattenLayout(sources.layout)
-  const walk = walkSlots(
-    mushafLayout.slots,
-    sources.glyphTable.map((row) => row.glyphs),
-  )
-  console.log(
-    `layout walk: ${mushafLayout.slots.length} slots, ${walk.anomalies.length} documented anomalies`,
-  )
-
-  const walkCheck = checkLayoutWalk(walk, ayahKeys)
-  problems.push(...walkCheck.failures.slice(0, 10))
-
-  const startPageCheck = checkStartPages(walk, sources, ayahKeys)
-  if (startPageCheck.failures.length === 0) {
-    console.log(
-      "start pages check: layout vs reference page column differs on exactly " +
-        `${DOCUMENTED_START_PAGE_DIFF_COUNT} ayahs (±1, print layout wins) ✓`,
-    )
-  }
-  problems.push(...startPageCheck.failures.slice(0, 10))
-
-  const headerCheck = checkSurahHeaders(mushafLayout, walk, sources)
-  problems.push(...headerCheck.failures.slice(0, 10))
-
-  // --- build page chunks ---
+  // --- page chunks: the QCF v1 word layout from the API ---
   const basmalahGlyphs = sources.layout.basmalah.v1
+  const layout = buildPageLayout(sources, basmalahGlyphs)
+  problems.push(...checkPageLayout(layout.chunks, sources).slice(0, 10))
+  console.log(
+    `page layout: ${layout.chunks.length} pages, ${layout.openings.length} surah openings at the top of a page`,
+  )
+
   let totalChunkBytes = 0
   const endSlotKeys = new Set<string>()
-  const builtChunks: PageChunk[] = []
-  for (const layoutPage of mushafLayout.pages) {
-    const chunk = buildPageChunk(layoutPage, walk, ayahKeys, basmalahGlyphs)
+  const builtChunks = layout.chunks
+  for (const chunk of builtChunks) {
     pageChunkSchema.parse(chunk)
     problems.push(...checkChunk(chunk).slice(0, 5))
-    builtChunks.push(chunk)
 
     for (const line of chunk.lines) {
       if (line.kind !== "words") continue
@@ -670,8 +474,8 @@ async function main(): Promise<void> {
   )
 
   // --- build metadata files ---
-  const surahs = buildSurahs(sources, walk)
-  const ayahs = buildAyahs(sources, walk, ayahKeys)
+  const surahs = buildSurahs(sources)
+  const ayahs = buildAyahs(sources)
   surahsFileSchema.parse(surahs)
   ayahsFileSchema.parse(ayahs)
   const ayahByKey = new Map<string, AyahMeta>()
@@ -692,8 +496,18 @@ async function main(): Promise<void> {
     }
   }
 
+  const juzPages = Array<number>(30).fill(0)
+  for (const verse of sources.verses) {
+    if (juzPages[verse.juz_number - 1] === 0) {
+      juzPages[verse.juz_number - 1] = verse.page_number
+    }
+  }
+  if (juzPages.some((page) => page === 0)) {
+    throw new Error("missing one or more juz start pages")
+  }
+
   const meta = {
-    juzPages: sources.layout.juzPages,
+    juzPages,
     pageHizbs,
     fit: {
       body: sources.layout.fit?.body.v1,
@@ -706,10 +520,7 @@ async function main(): Promise<void> {
   const ayahsBytes = await writeJson(path.join(OUT_DATA, "ayahs.json"), ayahs)
   const metaBytes = await writeJson(path.join(OUT_DATA, "meta.json"), meta)
 
-  // --- informational diff reports (print layout vs upstream conventions) ---
-  const apiPageDiffs = sources.verses.filter(
-    (verse, index) => verse.page_number !== walk.ayahStartPage[index],
-  ).length
+  // --- informational report: API page numbers vs the surah summaries ---
   const surahPageDiffs = surahs.filter((surah, index) => {
     const chapter = sources.chapters[index]
     return (
@@ -717,10 +528,9 @@ async function main(): Promise<void> {
       (surah.firstPage !== chapter.pages[0] || surah.lastPage !== chapter.pages[1])
     )
   }).length
-  console.log(
-    `print vs API pages: ${apiPageDiffs} ayah start pages, ${surahPageDiffs} surah page edges differ ` +
-      "(app data uses the print layout)",
-  )
+  if (surahPageDiffs > 0) {
+    console.warn(`surah page edges: ${surahPageDiffs} differ from the API chapter pages`)
+  }
 
   // --- fonts ---
   await mkdir(OUT_PAGES, { recursive: true })
