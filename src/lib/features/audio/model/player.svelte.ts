@@ -211,12 +211,14 @@ export class AudioPlayer {
     element.addEventListener("error", () => {
       // An emptied src on stop must not read as a failure.
       if (this.#sourceUrl === null) return
-      if (this.#sourceIsLocal || this.#localAttempted) {
+      if (this.#sourceIsLocal) {
         this.loading = false
         this.playing = false
-        this.error = this.failureMessage()
+        this.error = "Saved audio could not open — download it again"
         return
       }
+      // The local lookup is already in progress and owns the message.
+      if (this.#localAttempted) return
       void this.tryLocalSource()
     })
     this.#element = element
@@ -258,7 +260,7 @@ export class AudioPlayer {
       if (local === null) {
         this.loading = false
         this.playing = false
-        this.error = this.failureMessage()
+        this.error = "Not saved offline for this reciter"
         return
       }
       this.#objectUrl = local
@@ -268,7 +270,7 @@ export class AudioPlayer {
       if (loadId !== this.#loadId) return
       this.loading = false
       this.playing = false
-      this.error = this.failureMessage()
+      this.error = "Could not open saved audio — try again"
     }
   }
 
@@ -279,7 +281,11 @@ export class AudioPlayer {
     isLocal: boolean,
   ): void {
     const element = this.element()
+    // Blob URLs are same-origin, so CORS headers are unnecessary for them.
+    // Keeping the attribute off is friendlier to older iOS media elements.
+    element.crossOrigin = isLocal ? null : "anonymous"
     element.src = source
+    if (isLocal) element.load()
     this.position = track.startSeconds ?? 0
     this.duration = 0
     element.playbackRate = this.playbackRate
@@ -303,13 +309,6 @@ export class AudioPlayer {
           : "Playback could not start — tap Play to retry"
       })
     }
-  }
-
-  private failureMessage(): string {
-    const offline = typeof navigator !== "undefined" && navigator.onLine === false
-    return offline
-      ? "Not saved offline for this reciter"
-      : "Audio could not load — check your connection"
   }
 
   private revokeObjectUrl(): void {

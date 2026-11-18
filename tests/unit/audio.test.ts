@@ -88,6 +88,7 @@ class FakeAudio {
     this.playCount += 1
     return Promise.resolve()
   }
+  load(): void {}
   pause(): void {}
   removeAttribute(name: string): void {
     if (name === "src") this.src = ""
@@ -324,10 +325,10 @@ describe("audio player", () => {
     expect(player.reciterId).toBe("husary")
   })
 
-  it("reports load failures without clearing the playlist", async () => {
+  it("reports a missing offline copy without clearing the playlist", async () => {
     const { player, audio } = playerWith(TRACKS)
     audio.fire("error")
-    await vi.waitFor(() => expect(player.error).toContain("could not load"))
+    await vi.waitFor(() => expect(player.error).toContain("Not saved offline"))
     expect(player.active).toBe(true)
   })
 
@@ -344,9 +345,24 @@ describe("audio player", () => {
     await vi.waitFor(() => expect(audio.src).toBe("blob:saved-1"))
     expect(player.error).toBeNull()
     expect(player.current?.key).toBe("1:1")
+    expect(audio.crossOrigin).toBeNull()
 
     audio.fire("playing")
     expect(player.playing).toBe(true)
+  })
+
+  it("reports a saved file that cannot be opened", async () => {
+    const audio = new FakeAudio()
+    const player = new AudioPlayer(
+      () => audio as unknown as HTMLAudioElement,
+      async () => "blob:damaged",
+    )
+    player.play(TRACKS, { kind: "surah", label: "test" })
+
+    audio.fire("error")
+    await vi.waitFor(() => expect(audio.src).toBe("blob:damaged"))
+    audio.fire("error")
+    expect(player.error).toContain("Saved audio could not open")
   })
 })
 
