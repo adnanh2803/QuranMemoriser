@@ -291,54 +291,50 @@
   height: 1px;
 }
 
-/* --- ornamental lines ----------------------------------------------------- */
+/* --- surah openings ------------------------------------------------------- */
 
-/* A surah's opening line carries its calligraphic name in an ornamental
-   cartouche drawn by SurahTitle. */
+/* A surah's opening line carries its calligraphic name, flanked by a simple
+   symbol for the place it was revealed. */
 .m-line.m-surah {
   align-items: center;
   justify-content: center;
 }
 
 .surah-title {
-  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: clamp(0.45em, 1.8cqw, 0.95em);
   min-width: 0;
   color: var(--mushaf-ink);
 }
 
 .m-line.m-surah .surah-title {
-  display: flex;
   width: 100%;
   height: 100%;
 }
 
-/* The frame is a picture, not a target: the name stays centred above it. */
-.surah-title__frame {
-  position: absolute;
-  inset: 0;
+/* The symbols are drawn in the page ink, a touch lighter than the name. */
+.surah-title__symbol {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 1.15em;
+  height: 1.15em;
+  color: color-mix(in srgb, var(--mushaf-ink) 76%, var(--accent));
+}
+
+.surah-title__symbol svg {
   width: 100%;
   height: 100%;
-  overflow: visible;
-  pointer-events: none;
 }
 
-/* The frame is stretched to the printed line's width; keep its hairlines
-   even instead of letting the non-uniform scale thicken one axis. */
-.surah-title__frame :is(path, circle) {
-  vector-effect: non-scaling-stroke;
-}
-
+/* A slightly heavier name without a cartouche. */
 .surah-title .ph-surah {
-  position: relative;
-  z-index: 1;
+  -webkit-text-stroke: 0.018em currentColor;
 }
 
 /* A surah that begins at the top of a page: the print has only a basmalah
-   line there, so the name shares it, set above the basmalah. The plaque keeps
-   the decal's compact proportions. */
+   line there, so the name shares it, set above the basmalah. */
 .m-line.m-opening {
   flex-direction: column;
   align-items: center;
@@ -350,11 +346,16 @@
 .surah-title--compact {
   width: max-content;
   max-width: 100%;
-  padding: 0.13em 1.25em 0.15em;
+  gap: 0.4em;
+}
+
+.surah-title--compact .surah-title__symbol {
+  width: 0.92em;
+  height: 0.92em;
 }
 
 .m-line.m-opening .ph-surah {
-  font-size: 1.02em;
+  font-size: 0.98em;
   line-height: 1;
   transform: scaleX(1.04);
 }

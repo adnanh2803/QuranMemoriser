@@ -29,6 +29,8 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
     chunk: PageChunk | null
     juz: number | null
     hizb: number | null
+    /** Place of revelation for each surah, for the title's side symbols. */
+    revelations: ReadonlyMap<number, "makkah" | "madinah">
     fitBody: number
     centreBelow: number
     fonts: PageFontRegistry
@@ -40,7 +42,7 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
     onSelect: (candidate: RunCandidate, extend: boolean) => void
   }
 
-  let { page, chunk, juz, hizb, fitBody, centreBelow, fonts, selection, ledger, bookmarkedKeys, bookmarkedWordRanges, onSelect }: Props = $props()
+  let { page, chunk, juz, hizb, revelations, fitBody, centreBelow, fonts, selection, ledger, bookmarkedKeys, bookmarkedWordRanges, onSelect }: Props = $props()
   const bookmarkedSet = $derived(new Set(bookmarkedKeys))
 
   let box = $state<HTMLDivElement | null>(null)
@@ -432,13 +434,13 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
           <!-- Every surah the page opens gets its name; a mid-page opening is
                marked only here, since the running head carries no surah. -->
           <div class="m-line m-surah">
-            <SurahTitle surah={line.surah} />
+            <SurahTitle surah={line.surah} revelation={revelations.get(line.surah)} />
           </div>
         {:else if line.kind === "opening"}
           <!-- A surah whose basmalah fills the page's first line: its name
                sits on the page where it begins, above the basmalah. -->
           <div class="m-line m-opening">
-            <SurahTitle surah={line.surah} compact />
+            <SurahTitle surah={line.surah} revelation={revelations.get(line.surah)} compact />
             <span class="m-basmalah-run">{line.glyphs.split("|").join(" ")}</span>
           </div>
         {:else if line.kind === "basmalah"}

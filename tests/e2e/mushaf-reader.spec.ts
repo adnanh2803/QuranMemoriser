@@ -65,20 +65,23 @@ test("marks every surah opening printed on a page", async ({ page }) => {
   // Page 1 opens Al-Fatiha with its calligraphic name in the line grid. The
   // running head carries only the juz and hizb, both at the page's left edge.
   const pageOne = page.locator('.sheet[data-page="1"]')
+  const pageOneTitle = pageOne.locator(".m-line.m-surah .surah-title")
   await expect(pageOne.locator(".m-line.m-surah")).toHaveCount(1)
-  await expect(pageOne.locator(".m-line.m-surah .surah-title__frame")).toHaveCount(1)
+  await expect(pageOneTitle).toHaveAttribute("data-revelation", "makkah")
+  await expect(pageOneTitle.locator(".surah-title__symbol")).toHaveCount(2)
+  await expect(pageOneTitle.locator(".surah-title__frame")).toHaveCount(0)
   await expect(pageOne.locator(".sheet-head .ph-surah")).toHaveCount(0)
   await expect(pageOne.locator(".sheet-head .ph-juz")).not.toBeEmpty()
   await expect(pageOne.locator(".sheet-head .ph-hizb")).not.toBeEmpty()
 
-  // The cartouche fills the printed title line rather than growing the grid.
+  // The simple title sits inside the printed title line without growing it.
   const titleLine = await pageOne.locator(".m-line.m-surah").boundingBox()
-  const titleFrame = await pageOne.locator(".m-line.m-surah .surah-title__frame").boundingBox()
-  if (!titleLine || !titleFrame) throw new Error("Page 1 surah title was not laid out")
-  expect(titleFrame.x).toBeCloseTo(titleLine.x, 0)
-  expect(titleFrame.width).toBeCloseTo(titleLine.width, 0)
-  expect(titleFrame.y).toBeGreaterThanOrEqual(titleLine.y - 1)
-  expect(titleFrame.y + titleFrame.height).toBeLessThanOrEqual(titleLine.y + titleLine.height + 1)
+  const title = await pageOneTitle.boundingBox()
+  if (!titleLine || !title) throw new Error("Page 1 surah title was not laid out")
+  expect(title.x).toBeGreaterThanOrEqual(titleLine.x - 1)
+  expect(title.x + title.width).toBeLessThanOrEqual(titleLine.x + titleLine.width + 1)
+  expect(title.y).toBeGreaterThanOrEqual(titleLine.y - 1)
+  expect(title.y + title.height).toBeLessThanOrEqual(titleLine.y + titleLine.height + 1)
 
   const head = await pageOne.locator(".sheet-head").boundingBox()
   if (!head) throw new Error("Page 1 header was not laid out")
@@ -88,9 +91,19 @@ test("marks every surah opening printed on a page", async ({ page }) => {
     expect(box.x + box.width).toBeLessThanOrEqual(head.x + head.width / 2)
   }
 
-  // The last page opens three surahs, each with its name in the line grid.
   await page.getByRole("button", { name: "Show controls" }).click()
   const pageInput = page.getByLabel("Go to page")
+
+  // Al-Baqarah's title carries the Madinan mosque symbol instead.
+  await pageInput.fill("2")
+  await pageInput.press("Enter")
+  await page.waitForSelector('.sheet[data-page="2"] .mushaf.ready', { timeout: 20000 })
+  const pageTwoTitle = page.locator('.sheet[data-page="2"] .m-line.m-surah .surah-title')
+  await expect(pageTwoTitle).toHaveAttribute("data-revelation", "madinah")
+  await expect(pageTwoTitle.locator(".surah-title__symbol")).toHaveCount(2)
+
+  // The last page opens three surahs, each with its name in the line grid.
+  await page.getByRole("button", { name: "Show controls" }).click()
   await pageInput.fill("604")
   await pageInput.press("Enter")
   await page.waitForSelector('.sheet[data-page="604"] .mushaf.ready', { timeout: 20000 })
@@ -123,7 +136,12 @@ test("keeps a top-of-page surah name on the page where it begins", async ({ page
   const opening = page585.locator(".m-line.m-opening")
   await expect(opening).toHaveCount(1)
   await expect(opening.locator(".ph-surah")).not.toBeEmpty()
-  await expect(opening.locator(".surah-title--compact .surah-title__frame")).toHaveCount(1)
+  await expect(opening.locator(".surah-title--compact")).toHaveAttribute(
+    "data-revelation",
+    "makkah",
+  )
+  await expect(opening.locator(".surah-title--compact .surah-title__symbol")).toHaveCount(2)
+  await expect(opening.locator(".surah-title__frame")).toHaveCount(0)
   await expect(opening.locator(".m-basmalah-run")).not.toBeEmpty()
   await expect(page585.locator(".sheet-head .ph-surah")).toHaveCount(0)
   await expect(page585.locator('.m-word[data-s="80"][data-a="1"]').first()).toBeVisible()

@@ -108,6 +108,9 @@ const selectedSurahDownloaded = $derived.by(() => {
 const fitBody = $derived(meta?.fit.body ?? 19.76)
 const centreBelow = $derived(meta?.fit.centreBelow ?? 0.55)
 const savedBookmarkCount = $derived(savedBookmarks.length + savedWordBookmarks.length)
+const revelations = $derived(
+  new Map(surahs.map((surah) => [surah.surah, surah.revelation] as const)),
+)
 
 function wordRangeLabel(range: SelectionRun): string {
   const start = `${range.start.surah}:${range.start.ayah} word ${range.start.word}`
@@ -979,6 +982,7 @@ function cycleTheme(): void {
               chunk={chunks.get(current) ?? null}
               {juz}
               {hizb}
+              {revelations}
               {fitBody}
               {centreBelow}
               {fonts}
