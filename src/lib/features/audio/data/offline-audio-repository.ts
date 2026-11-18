@@ -140,6 +140,23 @@ export class OfflineAudioRepository {
     await this.cacheTimings(reciter)
   }
 
+  /**
+   * A blob URL for a saved ayah, or null when the network copy was not
+   * downloaded. Playback uses this when the service worker is unavailable
+   * or has not yet taken control, so saved audio still plays offline.
+   */
+  async localPlaybackUrl(url: string): Promise<string | null> {
+    if (this.cacheStorage === null) return null
+    try {
+      const cache = await this.cacheStorage.open(RECITATION_CACHE)
+      const response = await cache.match(url)
+      if (response === undefined) return null
+      return URL.createObjectURL(await response.blob())
+    } catch {
+      return null
+    }
+  }
+
   /** Remove one reciter's saved surah. Timing maps are shared, so they stay. */
   async removeSurahReciter(surah: number, reciterId: string): Promise<void> {
     if (this.cacheStorage === null) return

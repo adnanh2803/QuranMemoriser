@@ -107,6 +107,32 @@ test("downloads one chosen reciter for several surahs and removes them", async (
   ).toBeVisible()
 })
 
+test("plays downloaded audio with the network cut off", async ({ page }) => {
+  await page.getByRole("button", { name: "Show controls" }).click()
+  await page.getByRole("button", { name: "Open offline recitations" }).click()
+
+  const dialog = page.getByRole("dialog", { name: "Offline recitations" })
+  await dialog.getByRole("button", { name: "Download selected" }).click()
+  await expect(dialog.getByRole("status")).toHaveText(
+    "All selected recitations are saved for offline playback.",
+    { timeout: 15000 },
+  )
+
+  // Remove the route as well as the network: the saved Cache API copy is now
+  // the only place this ayah can come from. No service worker is involved.
+  await page.unroute("**/everyayah.com/data/**")
+  await page.context().setOffline(true)
+  await dialog.getByRole("button", { name: "Close offline recitations" }).click()
+  await expect(dialog).toBeHidden()
+
+  await page.locator('.m-word[data-s="1"][data-a="1"].m-end').click()
+  await page.getByRole("button", { name: "Play selected verses" }).click()
+  await expect(dock(page)).toBeVisible()
+  await expect(dock(page).getByRole("button", { name: "Pause" })).toBeVisible({
+    timeout: 10000,
+  })
+})
+
 test("plays the whole surah and walks it ayah by ayah", async ({ page }) => {
   await page.getByRole("button", { name: "Show controls" }).click()
   await page.getByRole("button", { name: "Play this surah" }).click()

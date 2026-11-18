@@ -45,11 +45,25 @@ export class AudioPlayer {
 
   #element: HTMLAudioElement | null = null
   #createElement: () => HTMLAudioElement
+  #localSource: (url: string) => Promise<string | null>
   #finishedIndex = -1
+  #sourceUrl: string | null = null
+  #sourceIsLocal = false
+  #localAttempted = false
+  #loadId = 0
+  #objectUrl: string | null = null
 
-  /** The element factory is injectable so tests can drive a fake. */
-  constructor(createElement: () => HTMLAudioElement = () => new Audio()) {
+  /**
+   * The element factory is injectable so tests can drive a fake. The local
+   * source resolver returns a blob URL for a saved ayah, used as a fallback
+   * when the service worker cannot serve the network URL offline.
+   */
+  constructor(
+    createElement: () => HTMLAudioElement = () => new Audio(),
+    localSource: (url: string) => Promise<string | null> = async () => null,
+  ) {
     this.#createElement = createElement
+    this.#localSource = localSource
     void this.loadTimings(this.reciterId)
   }
 
@@ -142,6 +156,11 @@ export class AudioPlayer {
       this.#element.pause()
       this.#element.removeAttribute("src")
     }
+    this.revokeObjectUrl()
+    this.#sourceUrl = null
+    this.#sourceIsLocal = false
+    this.#localAttempted = false
+    this.#loadId += 1
     this.tracks = []
     this.index = -1
     this.playing = false
@@ -159,7 +178,8 @@ export class AudioPlayer {
     element.preload = "auto"
     element.playbackRate = this.playbackRate
     // CORS mode: the service worker can then cache the response for offline
-    // replay, which EveryAyah allows with its wildcard header.
+    // replay, which EveryAyah allows with its wildcard header. Downloaded
+    // ayahs also have the Cache API blob fallback below.
     element.crossOrigin = "anonymous"
     element.addEventListener("playing", () => {
       this.loading = false
@@ -190,10 +210,14 @@ export class AudioPlayer {
     })
     element.addEventListener("error", () => {
       // An emptied src on stop must not read as a failure.
-      if (element.getAttribute("src") === null || element.getAttribute("src") === "") return
-      this.loading = false
-      this.playing = false
-      this.error = "Audio could not load — check your connection"
+      if (this.#sourceUrl === null) return
+      if (this.#sourceIsLocal || this.#localAttempted) {
+        this.loading = false
+        this.playing = false
+        this.error = this.failureMessage()
+        return
+      }
+      void this.tryLocalSource()
     })
     this.#element = element
     return element
@@ -202,8 +226,59 @@ export class AudioPlayer {
   private load(autoplay: boolean): void {
     const track = this.current
     if (track === null) return
-    const element = this.element()
+    this.revokeObjectUrl()
     const source = ayahUrl(this.reciter, track.surah, track.ayah)
+    this.#sourceUrl = source
+    this.#sourceIsLocal = false
+    this.#localAttempted = false
+    this.#loadId += 1
+    this.startSource(source, track, autoplay, false)
+  }
+
+  /**
+   * The media request failed. If the ayah was downloaded, swap to its Cache
+   * API blob so playback does not depend on the service worker having taken
+   * control yet. This is the difference between "saved" and "playable" on a
+   * first offline visit.
+   */
+  private async tryLocalSource(): Promise<void> {
+    const source = this.#sourceUrl
+    const track = this.current
+    if (source === null || track === null || this.#localAttempted) return
+    this.#localAttempted = true
+    const loadId = this.#loadId
+    this.loading = true
+    this.error = null
+    try {
+      const local = await this.#localSource(source)
+      if (loadId !== this.#loadId || this.current !== track || this.#sourceUrl !== source) {
+        if (local !== null) this.revokeUrl(local)
+        return
+      }
+      if (local === null) {
+        this.loading = false
+        this.playing = false
+        this.error = this.failureMessage()
+        return
+      }
+      this.#objectUrl = local
+      this.#sourceIsLocal = true
+      this.startSource(local, track, true, true)
+    } catch {
+      if (loadId !== this.#loadId) return
+      this.loading = false
+      this.playing = false
+      this.error = this.failureMessage()
+    }
+  }
+
+  private startSource(
+    source: string,
+    track: AudioTrack,
+    autoplay: boolean,
+    isLocal: boolean,
+  ): void {
+    const element = this.element()
     element.src = source
     this.position = track.startSeconds ?? 0
     this.duration = 0
@@ -223,20 +298,48 @@ export class AudioPlayer {
       element.play().catch(() => {
         this.loading = false
         this.playing = false
-        this.error = "Playback could not start — tap Play to retry"
+        this.error = isLocal
+          ? "Saved offline — tap Play to start"
+          : "Playback could not start — tap Play to retry"
       })
     }
   }
 
+  private failureMessage(): string {
+    const offline = typeof navigator !== "undefined" && navigator.onLine === false
+    return offline
+      ? "Not saved offline for this reciter"
+      : "Audio could not load — check your connection"
+  }
+
+  private revokeObjectUrl(): void {
+    if (this.#objectUrl === null) return
+    this.revokeUrl(this.#objectUrl)
+    this.#objectUrl = null
+  }
+
+  private revokeUrl(url: string): void {
+    if (typeof URL.revokeObjectURL === "function") URL.revokeObjectURL(url)
+  }
+
   private resume(): void {
+    const element = this.element()
+    // A retry is also a chance to find audio downloaded after the first
+    // attempt failed, so reload a failed network source and look in the
+    // offline cache again.
+    if (!this.#sourceIsLocal) {
+      this.#localAttempted = false
+      if (element.error) {
+        this.load(true)
+        return
+      }
+    }
     this.loading = true
-    this.element()
-      .play()
-      .catch(() => {
-        this.loading = false
-        this.playing = false
-        this.error = "Playback could not start — tap Play to retry"
-      })
+    element.play().catch(() => {
+      this.loading = false
+      this.playing = false
+      this.error = "Playback could not start — tap Play to retry"
+    })
   }
 
   private step(delta: number): void {

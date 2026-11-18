@@ -78,7 +78,10 @@ let offlineAudioOpen = $state(false)
 let swipeOrigin: { x: number; y: number } | null = null
 let suppressTapUntil = 0
 /** The recitation player: created once, lives across playlists. */
-const player = new AudioPlayer()
+const player = new AudioPlayer(
+  () => new Audio(),
+  (url) => offlineAudio.localPlaybackUrl(url),
+)
 /** All page chunks are loaded up front so page turns never wait on text data. */
 const chunks = new SvelteMap<number, PageChunk>()
 /** Slot indexes within verses, once every chunk has landed. */

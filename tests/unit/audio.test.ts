@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { AyahMeta } from "../../src/lib/domain/schemas"
 import {
@@ -324,11 +324,29 @@ describe("audio player", () => {
     expect(player.reciterId).toBe("husary")
   })
 
-  it("reports load failures without clearing the playlist", () => {
+  it("reports load failures without clearing the playlist", async () => {
     const { player, audio } = playerWith(TRACKS)
     audio.fire("error")
-    expect(player.error).toContain("could not load")
+    await vi.waitFor(() => expect(player.error).toContain("could not load"))
     expect(player.active).toBe(true)
+  })
+
+  it("falls back to a saved blob when the network copy fails", async () => {
+    const audio = new FakeAudio()
+    const player = new AudioPlayer(
+      () => audio as unknown as HTMLAudioElement,
+      async (url) => (url.endsWith("001001.mp3") ? "blob:saved-1" : null),
+    )
+    player.play(TRACKS, { kind: "surah", label: "test" })
+    expect(audio.src).toContain("001001")
+
+    audio.fire("error")
+    await vi.waitFor(() => expect(audio.src).toBe("blob:saved-1"))
+    expect(player.error).toBeNull()
+    expect(player.current?.key).toBe("1:1")
+
+    audio.fire("playing")
+    expect(player.playing).toBe(true)
   })
 })
 
