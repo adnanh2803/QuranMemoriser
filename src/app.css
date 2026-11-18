@@ -45,7 +45,7 @@
   --selection: rgba(70, 78, 73, 0.12);
   --selection-outline: rgba(70, 78, 73, 0.2);
   --bookmark: #b07d16;
-  --bookmark-wash: color-mix(in srgb, var(--bookmark) 13%, var(--page));
+  --bookmark-wash: color-mix(in srgb, var(--bookmark) 9%, var(--page));
   --hairline: rgba(30, 27, 22, 0.08);
   --page: #fffdf7;
   color-scheme: light;
@@ -63,7 +63,7 @@
   --selection: rgba(76, 68, 57, 0.14);
   --selection-outline: rgba(76, 68, 57, 0.22);
   --bookmark: #9c6f12;
-  --bookmark-wash: color-mix(in srgb, var(--bookmark) 15%, var(--page));
+  --bookmark-wash: color-mix(in srgb, var(--bookmark) 11%, var(--page));
   --hairline: rgba(43, 33, 24, 0.1);
   --page: #fdf8ec;
   color-scheme: light;
@@ -81,7 +81,7 @@
   --selection: rgba(221, 214, 196, 0.14);
   --selection-outline: rgba(221, 214, 196, 0.2);
   --bookmark: #d6b04a;
-  --bookmark-wash: color-mix(in srgb, var(--bookmark) 17%, var(--page));
+  --bookmark-wash: color-mix(in srgb, var(--bookmark) 13%, var(--page));
   --hairline: rgba(234, 228, 218, 0.1);
   --page: #211e1b;
   color-scheme: dark;

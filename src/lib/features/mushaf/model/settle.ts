@@ -40,7 +40,13 @@ export function settleLines(box: HTMLElement, centreBelow: number): boolean {
   const lines = box.querySelectorAll<HTMLElement>(".m-ayah")
   if (lines.length === 0) return true
 
-  const avail = box.clientWidth
+  const firstLine = lines[0]
+  if (!firstLine) return false
+  const lineStyle = getComputedStyle(firstLine)
+  const linePadX =
+    (Number.parseFloat(lineStyle.paddingInlineStart) || 0) +
+    (Number.parseFloat(lineStyle.paddingInlineEnd) || 0)
+  const avail = box.clientWidth - linePadX
   if (avail < 10) return false
 
   // Vertical settings move nothing sideways and can be cleared up front.
@@ -54,8 +60,6 @@ export function settleLines(box: HTMLElement, centreBelow: number): boolean {
   // it and pull the sheet off its fixed line grid.
   const magnify = box.offsetWidth > 0 ? box.getBoundingClientRect().width / box.offsetWidth : 1
   const scale = magnify > 0 ? magnify : 1
-  const firstLine = lines[0]
-  if (!firstLine) return false
   const lineHeight = firstLine.getBoundingClientRect().height / scale
   if (lineHeight <= 0) return false
 

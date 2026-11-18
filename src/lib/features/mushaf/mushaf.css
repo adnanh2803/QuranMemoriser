@@ -126,6 +126,7 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
+  position: relative;
   font-size: var(--m-size);
   color: var(--mushaf-ink);
   -webkit-text-stroke: 0.012em currentColor;
@@ -146,11 +147,19 @@
 .m-line {
   display: flex;
   align-items: baseline;
-  /* Share the extra room with the line edges so the words sit closer. */
-  justify-content: space-evenly;
+  /* A justified printed line meets both margins: the words share all the
+     slack between them, so their right and left edges line up down the page. */
+  justify-content: space-between;
   height: var(--m-line-h);
   line-height: var(--m-line-h);
   white-space: nowrap;
+}
+
+/* Arabic glyphs overhang their advance boxes; a small gutter keeps the first
+   and last words of a flush line clear of the page edge. The settle pass reads
+   this same padding so the measure it justifies against stays true. */
+.m-line.m-ayah {
+  padding-inline: 0.42em;
 }
 
 /* A line that stops short of the margin is centred rather than pulled apart —
@@ -167,37 +176,29 @@
   cursor: pointer;
 }
 
-/* A saved verse or word range reads as a warm strip laid behind its printed
-   line segment — one strip per line, measured from the run's words like the
-   selection bar, with a tab marking where the saved run begins. A live
-   selection paints over it, so the saved strip steps aside. */
-.m-word.m-bookmark-start:not(.m-selected)::before {
+/* Saved strips live in their own layer beneath the words. A selection wash
+   paints inside each word's stacking context, above this layer, so a saved
+   strip never disappears while its words are selected. Each printed line
+   segment gets its own wash; only the selection's first segment carries the
+   tiny ribbon, so a run wrapping onto a second row is not re-marked. */
+.m-bookmark-layer {
   position: absolute;
-  z-index: -1;
-  inset-block: 0.13em;
-  inset-inline-start: -0.18em;
-  width: calc(var(--m-bookmark-run-width, 100%) + 0.36em);
-  border-radius: 0.22em;
-  background-color: var(--bookmark-wash);
-  background-image: linear-gradient(
-    to top,
-    color-mix(in srgb, var(--bookmark) 48%, transparent) 0 0.045em,
-    transparent 0.045em
-  );
-  content: "";
+  inset: 0;
   pointer-events: none;
 }
 
-.m-word.m-bookmark-start:not(.m-pending)::after {
+.m-bookmark-band {
   position: absolute;
-  z-index: -1;
-  inset-block: 0.06em;
-  inset-inline-start: -0.18em;
-  width: 0.085em;
-  border-radius: 999px;
+  border-radius: 0.22em;
+  background: var(--bookmark-wash);
+}
+
+.m-bookmark-flag {
+  position: absolute;
+  border-radius: 0.04em 0.04em 0 0;
   background: var(--bookmark);
-  content: "";
-  pointer-events: none;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%);
+  filter: drop-shadow(0 0.02em 0.035em rgb(31 24 8 / 0.28));
 }
 
 /* Selected ayahs read as a highlighter bar: shorter than the line box so it

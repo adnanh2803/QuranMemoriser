@@ -16,6 +16,8 @@ test("bookmarks a selection and jumps back to it", async ({ page }) => {
   await expect(page.getByRole("status")).toContainText("113:1 selected")
   await page.getByRole("button", { name: "Bookmark selection" }).click()
   await expect(page.getByText(/Bookmarked 1 verse/)).toBeVisible()
+  await page.getByRole("button", { name: "Clear selection" }).click()
+  await expect(page.getByRole("status")).toHaveCount(0)
 
   // Leave for the first page, then return through the bookmark.
   await page.keyboard.press("Home")
@@ -29,21 +31,40 @@ test("bookmarks a selection and jumps back to it", async ({ page }) => {
   await expect(page.locator('.sheet[data-page="604"]')).toBeVisible()
 
   // The saved verse wears its bookmark strip on the page.
-  const strip = page.locator('.sheet[data-page="604"] .m-word.m-bookmark-start')
+  const strip = page.locator('.sheet[data-page="604"] .m-bookmark-band')
   await expect(strip).toHaveCount(1)
-  await expect
-    .poll(async () =>
-      Number.parseFloat(
-        await strip.evaluate((el) => el.style.getPropertyValue("--m-bookmark-run-width")),
-      ),
-    )
-    .toBeGreaterThan(0)
+  await expect.poll(async () => (await strip.boundingBox())?.width ?? 0).toBeGreaterThan(0)
+
+  // Selecting the verse keeps its saved strip visible.
+  await page.locator('.sheet[data-page="604"] .m-word[data-s="113"][data-a="1"].m-end').click()
+  await expect(page.getByRole("status")).toContainText("113:1 selected")
+  await expect(strip).toBeVisible()
+  await expect(page.locator('.sheet[data-page="604"] .m-bookmark-flag')).toHaveCount(1)
 
   // Removing it empties the panel (the jump closed it; reopen first).
   await page.getByRole("button", { name: "Show controls" }).click()
   await page.getByRole("button", { name: /Bookmarks/ }).click()
   await page.getByRole("button", { name: "Remove bookmark 113:1" }).click()
   await expect(page.getByText("No bookmarks yet")).toBeVisible()
+})
+
+test("marks a saved selection once however many printed lines it spans", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" })
+  await page.waitForSelector('.sheet[data-page="1"] .mushaf.ready', { timeout: 20000 })
+
+  // Al-Baqarah 2:8 begins near the end of one printed line and runs on into
+  // the next: two strips, but one bookmark ribbon.
+  await page.getByRole("button", { name: "Show controls" }).click()
+  await page.getByLabel("Go to page").fill("3")
+  await page.getByLabel("Go to page").press("Enter")
+  await page.waitForSelector('.sheet[data-page="3"] .mushaf.ready', { timeout: 15000 })
+  await page.locator('.sheet[data-page="3"] .m-word[data-s="2"][data-a="8"].m-end').click()
+  await expect(page.getByRole("status")).toContainText("2:8 selected")
+  await page.getByRole("button", { name: "Bookmark selection" }).click()
+  await expect(page.getByText(/Bookmarked 1 verse/)).toBeVisible()
+
+  await expect(page.locator('.sheet[data-page="3"] .m-bookmark-band')).toHaveCount(2)
+  await expect(page.locator('.sheet[data-page="3"] .m-bookmark-flag')).toHaveCount(1)
 })
 
 test("keeps reading with the network cut off after install", async ({ page }) => {

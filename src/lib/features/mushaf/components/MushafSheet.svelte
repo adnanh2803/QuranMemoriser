@@ -44,6 +44,7 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
   const bookmarkedSet = $derived(new Set(bookmarkedKeys))
 
   let box = $state<HTMLDivElement | null>(null)
+  let bookmarkLayer = $state<HTMLDivElement | null>(null)
   let ready = $state(false)
   let fontReady = $state(false)
   let longPressTimer: ReturnType<typeof setTimeout> | null = null
@@ -152,7 +153,7 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
       }
     }
     updateSelectionRunWidths(el)
-    updateBookmarkRunWidths(el)
+    updateBookmarkLayer(el)
   }
 
   function updateSelectionRunWidths(el: HTMLElement): void {
@@ -183,8 +184,17 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
     }
   }
 
-  /** One saved strip per printed line segment, measured from its words. */
-  function updateBookmarkRunWidths(el: HTMLElement): void {
+  /**
+   * Saved strips live in a layer of their own, beneath the words. A selection
+   * wash paints inside each word's stacking context, above this layer, so the
+   * saved strip stays visible even while its words are selected.
+   */
+  function updateBookmarkLayer(el: HTMLElement): void {
+    const layer = bookmarkLayer
+    if (!layer) return
+    layer.replaceChildren()
+    const layerRect = layer.getBoundingClientRect()
+    let previousLineMarked = false
     for (const line of el.querySelectorAll<HTMLElement>(".m-line.m-ayah")) {
       const words = Array.from(line.querySelectorAll<HTMLElement>(".m-word"))
       for (let index = 0; index < words.length; index++) {
@@ -203,13 +213,38 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
         }
         const finish = words[end]
         if (!finish) continue
-        const firstRect = start.getBoundingClientRect()
-        const lastRect = finish.getBoundingClientRect()
-        start.style.setProperty(
-          "--m-bookmark-run-width",
-          `${Math.max(firstRect.right - lastRect.left, firstRect.width)}px`,
-        )
+        const first = start.getBoundingClientRect()
+        const last = finish.getBoundingClientRect()
+        const fontSize = Number.parseFloat(getComputedStyle(start).fontSize) || 16
+        const cushion = fontSize * 0.18
+        const top = first.top - layerRect.top + fontSize * 0.13
+        const height = first.height - fontSize * 0.26
+        const band = document.createElement("span")
+        band.className = "m-bookmark-band"
+        band.style.left = `${last.left - layerRect.left - cushion}px`
+        band.style.top = `${top}px`
+        band.style.width = `${first.right - last.left + cushion * 2}px`
+        band.style.height = `${height}px`
+        layer.append(band)
+        // One ribbon marks the selection itself, not every printed row it
+        // wraps onto: a line that opens mid-selection continues the run above.
+        if (index === 0 && previousLineMarked) continue
+        const bandRight = first.right - layerRect.left + cushion
+        const flagWidth = fontSize * 0.3
+        const flagHeight = fontSize * 0.42
+        const flag = document.createElement("span")
+        flag.className = "m-bookmark-flag"
+        flag.style.left = `${bandRight - flagWidth + fontSize * 0.02}px`
+        flag.style.top = `${top - flagHeight + fontSize * 0.12}px`
+        flag.style.width = `${flagWidth}px`
+        flag.style.height = `${flagHeight}px`
+        layer.append(flag)
       }
+      const lineEnd = words[words.length - 1]
+      previousLineMarked =
+        !!lineEnd &&
+        (lineEnd.classList.contains("m-bookmarked") ||
+          lineEnd.classList.contains("m-word-bookmarked"))
     }
   }
 
@@ -239,9 +274,10 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
   $effect(() => {
     void bookmarkedKeys
     void bookmarkedWordRanges
+    void bookmarkLayer
     const el = box
     if (!el || !fontReady) return
-    requestAnimationFrame(() => updateBookmarkRunWidths(el))
+    requestAnimationFrame(() => updateBookmarkLayer(el))
   })
 
   const wordIdentity = (word: MushafWord): WordIdentity => ({
@@ -316,7 +352,7 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
       )
     )
   }
-  /** The first saved word of a printed line: where the bookmark tab sits. */
+  /** The first saved word of each printed line: where a strip segment begins. */
   const isBookmarkStart = (words: MushafWord[], index: number): boolean => {
     const word = words[index]
     if (!word || !(isBookmarked(word) || isWordBookmarked(word))) return false
@@ -407,6 +443,7 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
     style="font-family:'{fonts.familyFor(page)}';"
     aria-hidden="true"
   >
+    <div class="m-bookmark-layer" bind:this={bookmarkLayer}></div>
     {#if chunk}
       {#each chunk.lines as line, lineIndex (line.line)}
         {#if line.kind === "surah"}
