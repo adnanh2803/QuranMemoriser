@@ -70,7 +70,9 @@ export class BookmarkRepository {
 
   removeWordRange(range: WordRangeBookmark): WordRangeBookmark[] {
     const key = wordRangeBookmarkKey(range)
-    return this.saveWordRanges(this.listWordRanges().filter((item) => wordRangeBookmarkKey(item) !== key))
+    return this.saveWordRanges(
+      this.listWordRanges().filter((item) => wordRangeBookmarkKey(item) !== key),
+    )
   }
 
   remove(key: VerseKey): VerseKey[] {

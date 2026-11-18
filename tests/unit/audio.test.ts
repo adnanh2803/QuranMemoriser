@@ -2,14 +2,23 @@ import { beforeEach, describe, expect, it } from "vitest"
 
 import type { AyahMeta } from "../../src/lib/domain/schemas"
 import {
-  RECITERS,
   ayahUrl,
+  RECITERS,
   reciterById,
   storedReciterId,
 } from "../../src/lib/features/audio/data/audio-repository"
-import { tracksForJuz, tracksForKeys, tracksForSurah } from "../../src/lib/features/audio/model/playlists"
 import { AudioPlayer, type AudioTrack } from "../../src/lib/features/audio/model/player.svelte"
-import type { CommandContext, WordIdentity } from "../../src/lib/features/mushaf/data/mushaf-repository"
+import {
+  tracksForJuz,
+  tracksForKeys,
+  tracksForSelection,
+  tracksForSurah,
+} from "../../src/lib/features/audio/model/playlists"
+import type { VerseWordTimings } from "../../src/lib/features/audio/model/word-timings"
+import type {
+  CommandContext,
+  WordIdentity,
+} from "../../src/lib/features/mushaf/data/mushaf-repository"
 
 /** An index over the first three surahs (7 + 286 + 200) for key lookups. */
 const VERSE_COUNTS = [7, 286, 200]
@@ -61,6 +70,9 @@ class FakeAudio {
   preload = ""
   ended = false
   playCount = 0
+  currentTime = 0
+  duration = Number.NaN
+  readyState = 0
 
   addEventListener(type: string, listener: () => void): void {
     const existing = this.listeners.get(type) ?? []
@@ -103,13 +115,81 @@ describe("playlist builders", () => {
 
   it("builds a selection playlist from the command context", () => {
     const tracks = tracksForKeys(context, ["1:2", "2:286", "9:9"])
-    expect(tracks.map((track) => track.key)).toEqual(["1:2"])
+    expect(tracks.map((track) => track.key)).toEqual(["1:2", "2:286"])
     expect(tracks[0]).toEqual({ key: "1:2", surah: 1, ayah: 2 })
   })
 
   it("cuts a juz playlist exactly on the juz field", () => {
     expect(tracksForJuz(AYAHS, 2).map((track) => track.key)).toEqual(["1:7", "2:1"])
     expect(tracksForJuz(AYAHS, 1).map((track) => track.key)).toEqual(["1:1", "1:2"])
+  })
+})
+
+/** Word slots per verse, numbered as the sheet draws them (medallion last). */
+const wordContext: CommandContext = {
+  ...context,
+  verseWordCount(key: string): number | undefined {
+    if (key === "1:1") return 5
+    if (key === "1:2") return 4
+    return undefined
+  },
+}
+
+/** Word timings in the quran-align shape: zero-based slots, end exclusive. */
+const TIMINGS: VerseWordTimings = {
+  "1:1": [
+    [0, 1, 1000, 2000],
+    [1, 2, 2000, 3000],
+    [2, 3, 3000, 4000],
+    [3, 4, 4000, 5000],
+  ],
+  "1:2": [
+    [0, 1, 0, 1000],
+    [1, 2, 1000, 2000],
+    [2, 3, 2000, 3000],
+  ],
+}
+
+describe("selection clips", () => {
+  it("plays whole verses uncut", () => {
+    const run = { start: { surah: 1, ayah: 1, word: 1 }, end: { surah: 1, ayah: 1, word: 5 } }
+    expect(tracksForSelection(wordContext, ["1:1"], run, TIMINGS)).toEqual([
+      { key: "1:1", surah: 1, ayah: 1 },
+    ])
+  })
+
+  it("cuts a mid-verse run to its word timings with a little padding", () => {
+    const run = { start: { surah: 1, ayah: 1, word: 2 }, end: { surah: 1, ayah: 1, word: 3 } }
+    const tracks = tracksForSelection(wordContext, ["1:1"], run, TIMINGS)
+    expect(tracks).toHaveLength(1)
+    expect(tracks?.[0]?.startSeconds).toBeCloseTo(1.93)
+    expect(tracks?.[0]?.endSeconds).toBeCloseTo(4.07)
+  })
+
+  it("clips only the boundary verses of a longer run", () => {
+    const run = { start: { surah: 1, ayah: 1, word: 3 }, end: { surah: 1, ayah: 2, word: 2 } }
+    const tracks = tracksForSelection(wordContext, ["1:1", "1:2"], run, TIMINGS)
+    expect(tracks?.map((track) => track.key)).toEqual(["1:1", "1:2"])
+    expect(tracks?.[0]?.startSeconds).toBeCloseTo(2.93)
+    expect(tracks?.[0]?.endSeconds).toBeCloseTo(5.07)
+    expect(tracks?.[1]?.startSeconds).toBe(0)
+    expect(tracks?.[1]?.endSeconds).toBeCloseTo(2.07)
+  })
+
+  it("refuses a partial verse without word timings", () => {
+    const run = { start: { surah: 1, ayah: 1, word: 2 }, end: { surah: 1, ayah: 1, word: 3 } }
+    expect(tracksForSelection(wordContext, ["1:1"], run, {})).toBeNull()
+  })
+
+  it("refuses timings that leave a gap under the run", () => {
+    const gapped: VerseWordTimings = {
+      "1:1": [
+        [0, 1, 1000, 2000],
+        [2, 3, 3000, 4000],
+      ],
+    }
+    const run = { start: { surah: 1, ayah: 1, word: 1 }, end: { surah: 1, ayah: 1, word: 3 } }
+    expect(tracksForSelection(wordContext, ["1:1"], run, gapped)).toBeNull()
   })
 })
 
@@ -140,14 +220,39 @@ describe("audio player", () => {
     expect(player.playing).toBe(true)
   })
 
-  it("walks forward on ended and stops at the playlist end", () => {
+  it("walks forward on ended and keeps the last track when the playlist ends", () => {
     const { player, audio } = playerWith(TRACKS)
     audio.fire("ended")
     expect(player.current?.key).toBe("1:2")
     expect(audio.src).toBe("https://everyayah.com/data/Alafasy_128kbps/001002.mp3")
     audio.fire("ended")
-    expect(player.active).toBe(false)
-    expect(audio.src).toBe("")
+    expect(player.playing).toBe(false)
+    expect(player.current?.key).toBe("1:2")
+    expect(player.active).toBe(true)
+    expect(audio.playCount).toBe(2)
+  })
+
+  it("starts a clipped track at its first selected word", () => {
+    const audio = new FakeAudio()
+    const player = new AudioPlayer(() => audio as unknown as HTMLAudioElement)
+    player.play([{ key: "1:1", surah: 1, ayah: 1, startSeconds: 1.5, endSeconds: 3 }], {
+      kind: "selection",
+      label: "words",
+    })
+    expect(player.position).toBe(1.5)
+    audio.fire("loadedmetadata")
+    expect(audio.currentTime).toBe(1.5)
+  })
+
+  it("moves on when a clip reaches its end time", () => {
+    const { player, audio } = playerWith([
+      { key: "1:1", surah: 1, ayah: 1, startSeconds: 1, endSeconds: 2 },
+      { key: "1:2", surah: 1, ayah: 2 },
+    ])
+    audio.currentTime = 2
+    audio.fire("timeupdate")
+    expect(player.current?.key).toBe("1:2")
+    expect(audio.src).toContain("001002")
   })
 
   it("steps with the bar's buttons, bounded at the ends", () => {

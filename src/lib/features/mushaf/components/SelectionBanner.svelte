@@ -24,7 +24,16 @@ interface Props {
   onWordBookmarks: (ranges: WordRangeBookmark[]) => void
 }
 
-let { selection, repository, bookmarks, player, context, raised, onBookmarks, onWordBookmarks }: Props = $props()
+let {
+  selection,
+  repository,
+  bookmarks,
+  player,
+  context,
+  raised,
+  onBookmarks,
+  onWordBookmarks,
+}: Props = $props()
 
 let copied = $state<string | null>(null)
 let toastTimer: ReturnType<typeof setTimeout> | null = null

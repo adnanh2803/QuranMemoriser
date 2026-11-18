@@ -3,7 +3,7 @@
  * whole juz to the ordered tracks the player walks. A juz is cut exactly
  * on the juz field of the shipped ayah rows, which run in mushaf order.
  */
-import { parseVerseKey, verseKey, type AyahMeta, type VerseKey } from "../../../domain/schemas"
+import { type AyahMeta, parseVerseKey, type VerseKey, verseKey } from "../../../domain/schemas"
 import type { CommandContext } from "../../mushaf/data/mushaf-repository"
 import type { SelectionRun } from "../../mushaf/model/selection.svelte"
 import type { AudioTrack } from "./player.svelte"

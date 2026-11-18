@@ -1,29 +1,29 @@
 <!-- The recitation dock: position, transport, speed, repeat and reciter controls. -->
 <script lang="ts">
-  import type { SurahSummary } from "../../../domain/schemas"
-  import { RECITERS } from "../data/audio-repository"
-  import type { AudioPlayer } from "../model/player.svelte"
+import type { SurahSummary } from "../../../domain/schemas"
+import { RECITERS } from "../data/audio-repository"
+import type { AudioPlayer } from "../model/player.svelte"
 
-  interface Props {
-    player: AudioPlayer
-    surahs: SurahSummary[]
-  }
+interface Props {
+  player: AudioPlayer
+  surahs: SurahSummary[]
+}
 
-  let { player, surahs }: Props = $props()
+let { player, surahs }: Props = $props()
 
-  const label = $derived.by(() => {
-    const track = player.current
-    if (track === null) return ""
-    const summary = surahs.find((item) => item.surah === track.surah)
-    return summary ? `${track.key} · ${summary.name}` : track.key
-  })
+const label = $derived.by(() => {
+  const track = player.current
+  if (track === null) return ""
+  const summary = surahs.find((item) => item.surah === track.surah)
+  return summary ? `${track.key} · ${summary.name}` : track.key
+})
 
-  function formatTime(seconds: number): string {
-    if (!Number.isFinite(seconds) || seconds < 0) return "0:00"
-    const whole = Math.floor(seconds)
-    const minutes = Math.floor(whole / 60)
-    return `${minutes}:${String(whole % 60).padStart(2, "0")}`
-  }
+function formatTime(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00"
+  const whole = Math.floor(seconds)
+  const minutes = Math.floor(whole / 60)
+  return `${minutes}:${String(whole % 60).padStart(2, "0")}`
+}
 </script>
 
 {#if player.active}

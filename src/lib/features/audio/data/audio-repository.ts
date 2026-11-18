@@ -24,7 +24,11 @@ export const RECITERS: Reciter[] = [
   { id: "husary", label: "Mahmoud Al-Husary (Murattal)", folder: "Husary_64kbps" },
   { id: "minshawi", label: "Al-Minshawi (Murattal)", folder: "Minshawy_Murattal_128kbps" },
   { id: "abdulbasit", label: "Abdul Basit (Murattal)", folder: "Abdul_Basit_Murattal_64kbps" },
-  { id: "abdulbasit-mujawwad", label: "Abdul Basit (Mujawwad)", folder: "Abdul_Basit_Mujawwad_128kbps" },
+  {
+    id: "abdulbasit-mujawwad",
+    label: "Abdul Basit (Mujawwad)",
+    folder: "Abdul_Basit_Mujawwad_128kbps",
+  },
   { id: "sudais", label: "Abdurrahman As-Sudais", folder: "Abdurrahmaan_As-Sudais_192kbps" },
   { id: "shaatree", label: "Abu Bakr Ash-Shaatree", folder: "Abu_Bakr_Ash-Shaatree_128kbps" },
   { id: "hani-rifai", label: "Hani Rifai", folder: "Hani_Rifai_192kbps" },

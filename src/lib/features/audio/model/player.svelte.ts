@@ -106,7 +106,9 @@ export class AudioPlayer {
 
   /** Switch reciters: the current ayah restarts, the playlist position stays. */
   setReciter(id: string): void {
-    const hasClips = this.tracks.some((track) => track.startSeconds !== undefined || track.endSeconds !== undefined)
+    const hasClips = this.tracks.some(
+      (track) => track.startSeconds !== undefined || track.endSeconds !== undefined,
+    )
     if (this.source?.kind === "selection" && hasClips && !hasWordTimings(id)) {
       this.error = `Word-level playback is unavailable for ${reciterById(id).label}`
       return
@@ -228,11 +230,13 @@ export class AudioPlayer {
 
   private resume(): void {
     this.loading = true
-    this.element().play().catch(() => {
-      this.loading = false
-      this.playing = false
-      this.error = "Playback could not start — tap Play to retry"
-    })
+    this.element()
+      .play()
+      .catch(() => {
+        this.loading = false
+        this.playing = false
+        this.error = "Playback could not start — tap Play to retry"
+      })
   }
 
   private step(delta: number): void {
