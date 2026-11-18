@@ -9,8 +9,8 @@ test("shows one Mushaf page and slides between pages with a swipe", async ({ pag
   await expect(page.locator(".sheet")).toHaveCount(1)
   await expect(page.getByRole("button", { name: "Show controls" })).toBeVisible()
   await page.getByRole("button", { name: "Show controls" }).click()
-  await expect(page.getByRole("button", { name: "Hide controls" })).toBeVisible()
-  await page.getByRole("button", { name: "Hide controls" }).click()
+  await expect(page.getByRole("button", { name: "Close menu" })).toBeVisible()
+  await page.getByRole("button", { name: "Close menu" }).click()
   await expect(page.getByRole("button", { name: "Show controls" })).toBeVisible()
 
   const main = await page.locator("main").boundingBox()
@@ -56,6 +56,25 @@ test("keeps the same sheet dimensions on short and full pages", async ({ page })
   if (!fullPage) throw new Error("Page 3 was not laid out")
   expect(fullPage.width).toBeCloseTo(shortPage.width, 1)
   expect(fullPage.height).toBeCloseTo(shortPage.height, 1)
+})
+
+test("marks every surah opening printed on a page", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" })
+  await page.waitForSelector('.sheet[data-page="1"] .mushaf.ready', { timeout: 20000 })
+
+  // Page 1 opens Al-Fatiha under the running head's calligraphic name.
+  const pageOne = page.locator('.sheet[data-page="1"]')
+  await expect(pageOne.locator(".m-line.m-surah")).toHaveCount(1)
+  await expect(pageOne.locator(".sheet-head .ph-surah")).not.toBeEmpty()
+
+  // The last page opens three surahs; only the first is named above the page,
+  // so the other two must keep their names in the line grid.
+  await page.getByRole("button", { name: "Show controls" }).click()
+  const pageInput = page.getByLabel("Go to page")
+  await pageInput.fill("604")
+  await pageInput.press("Enter")
+  await page.waitForSelector('.sheet[data-page="604"] .mushaf.ready', { timeout: 20000 })
+  await expect(page.locator('.sheet[data-page="604"] .m-line.m-surah')).toHaveCount(3)
 })
 
 test("marks a start, completes the range on the second tap", async ({ page }) => {

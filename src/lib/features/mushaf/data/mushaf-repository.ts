@@ -149,8 +149,7 @@ export class MushafRepository {
 
   /**
    * The juz a page sits in, from the layout's juz start pages. The running
-   * head labels every sheet this way, so it must not wait on the 2 MB ayah
-   * file.
+   * head labels every sheet this way, so it must not wait on the ayah file.
    */
   juzOfPage(page: number, meta: MushafMeta): number {
     let juz = 1
@@ -158,6 +157,11 @@ export class MushafRepository {
       if (start <= page) juz = index + 1
     }
     return juz
+  }
+
+  /** The hizb at the top of a page, from the compact page index. */
+  hizbOfPage(page: number, meta: MushafMeta): number {
+    return meta.pageHizbs[page - 1] ?? 1
   }
 
   /** The command context selection commands resolve against: verse order

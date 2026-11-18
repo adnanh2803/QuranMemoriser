@@ -11,7 +11,7 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
 -->
 <script lang="ts">
   import type { MushafWord, PageChunk, VerseKey } from "../../../domain/schemas"
-import type { WordRangeBookmark } from "../data/bookmark-repository"
+  import type { WordRangeBookmark } from "../data/bookmark-repository"
   import type { PageFontRegistry } from "../data/page-fonts"
   import type { WordIdentity } from "../data/mushaf-repository"
   import {
@@ -22,12 +22,13 @@ import type { WordRangeBookmark } from "../data/bookmark-repository"
   } from "../model/selection.svelte"
   import type { WordLedger } from "../model/word-ledger"
   import { settleLines } from "../model/settle"
-  import { SURAH_WORD, surahNameGlyph } from "../model/surah-names"
+  import { surahNameGlyph } from "../model/surah-names"
 
   interface Props {
     page: number
     chunk: PageChunk | null
     juz: number | null
+    hizb: number | null
     fitBody: number
     centreBelow: number
     fonts: PageFontRegistry
@@ -39,7 +40,7 @@ import type { WordRangeBookmark } from "../data/bookmark-repository"
     onSelect: (candidate: RunCandidate, extend: boolean) => void
   }
 
-  let { page, chunk, juz, fitBody, centreBelow, fonts, selection, ledger, bookmarkedKeys, bookmarkedWordRanges, onSelect }: Props = $props()
+  let { page, chunk, juz, hizb, fitBody, centreBelow, fonts, selection, ledger, bookmarkedKeys, bookmarkedWordRanges, onSelect }: Props = $props()
   const bookmarkedSet = $derived(new Set(bookmarkedKeys))
 
   let box = $state<HTMLDivElement | null>(null)
@@ -49,7 +50,6 @@ import type { WordRangeBookmark } from "../data/bookmark-repository"
   let longPressOrigin: { x: number; y: number } | null = null
   let longPressFired = false
 
-  const lineCount = $derived(chunk?.lines.length ?? (page <= 2 ? 8 : 15))
   /** The surah the running head names: the one at the top of the page. */
   const headSurah = $derived.by(() => {
     if (!chunk) return null
@@ -333,7 +333,7 @@ import type { WordRangeBookmark } from "../data/bookmark-repository"
 <section
   class="sheet"
   data-page={page}
-  style="--m-fit-body:{fitBody}; --m-lines:{lineCount};"
+  style="--m-fit-body:{fitBody};"
 >
   <header class="sheet-head">
     {#if juz !== null}
@@ -342,11 +342,13 @@ import type { WordRangeBookmark } from "../data/bookmark-repository"
       <span class="ph-label ph-juz"></span>
     {/if}
     {#if headSurah !== null}
-      <span class="ph-surah"
-        ><span class="sw">{SURAH_WORD}</span><span class="sn">{surahNameGlyph(headSurah)}</span></span
-      >
+      <span class="ph-surah">{surahNameGlyph(headSurah)}</span>
     {/if}
-    <span class="ph-label ph-page">{arabicNumber.format(page)}</span>
+    {#if hizb !== null}
+      <span class="ph-label ph-hizb">حزب {arabicNumber.format(hizb)}</span>
+    {:else}
+      <span class="ph-label ph-hizb"></span>
+    {/if}
   </header>
 
   <!-- The glyphs are private-use codepoints: gibberish to reading modes, so
@@ -362,15 +364,13 @@ import type { WordRangeBookmark } from "../data/bookmark-repository"
     {#if chunk}
       {#each chunk.lines as line, lineIndex (line.line)}
         {#if line.kind === "surah"}
-          <div class="m-line m-surah m-opening-title">
-            <span class="ph-surah"
-              ><span class="sw">{SURAH_WORD}</span><span class="sn"
-                  >{surahNameGlyph(line.surah)}</span
-              ></span
-            >
+          <!-- Every surah the page opens gets its name; a mid-page opening is
+               marked only here, since the running head names the top surah. -->
+          <div class="m-line m-surah">
+            <span class="ph-surah">{surahNameGlyph(line.surah)}</span>
           </div>
         {:else if line.kind === "basmalah"}
-          <div class="m-line m-basmalah m-opening-basmalah">
+          <div class="m-line m-basmalah">
             <span class="m-basmalah-run">{line.glyphs.split("|").join(" ")}</span>
           </div>
         {:else}

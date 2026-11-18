@@ -104,9 +104,8 @@ export class PageFontRegistry {
 }
 
 /**
- * The two static typefaces the reader draws with: the basmalah band's own
- * face (every opening carries the band, and Al-Fatihah 1:1 *is* the basmalah)
- * and the ornamental surah-name face used by headers and the running head.
+ * Static typefaces: the basmalah band's face, calligraphic surah name glyphs,
+ * and the continuous Hafs face used in lists.
  */
 export function registerStaticFonts(): void {
   document.fonts.add(new FontFace("QCF-BSML", "url(/fonts/QCF_BSML.woff2)"))

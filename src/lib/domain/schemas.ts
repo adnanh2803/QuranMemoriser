@@ -222,11 +222,12 @@ export const pageChunkSchema = z.object({
 export type PageChunk = z.infer<typeof pageChunkSchema>
 
 /**
- * Reader-wide constants (public/data/meta.json): the page each juz opens on
- * and the QCF v1 type scale the whole mushaf is set at.
+ * Reader-wide constants (public/data/meta.json): juz starts, per-page hizb
+ * labels and the QCF v1 type scale for the whole mushaf.
  */
 export const mushafMetaSchema = z.object({
   juzPages: z.array(pageNumberSchema).length(30),
+  pageHizbs: z.array(z.number().int().min(1).max(60)).length(604),
   fit: mushafFitSchema,
 })
 export type MushafMeta = z.infer<typeof mushafMetaSchema>

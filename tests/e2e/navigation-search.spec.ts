@@ -7,20 +7,24 @@ test("navigates by surah, juz, and exact page", async ({ page }) => {
   await page.waitForSelector('.sheet[data-page="1"] .mushaf.ready', { timeout: 20000 })
 
   // The surah index opens a surah's first page (Al-Kahf starts on page 293).
+  await page.getByRole("button", { name: "Show controls" }).click()
   await page.getByLabel("Go to surah").selectOption({ label: "18. Al-Kahf" })
   await expect(page.locator('.sheet[data-page="293"]')).toBeVisible()
 
   // The juz index opens a juz's start page (juz 30 starts on page 582).
+  await page.getByRole("button", { name: "Show controls" }).click()
   await page.getByLabel("Go to juz").selectOption("30")
   await expect(page.locator('.sheet[data-page="582"]')).toBeVisible()
 
   // An exact page number jumps straight to it.
+  await page.getByRole("button", { name: "Show controls" }).click()
   const pageInput = page.getByLabel("Go to page")
   await pageInput.fill("120")
   await pageInput.press("Enter")
   await expect(page.locator('.sheet[data-page="120"]')).toBeVisible()
 
   // The indicator follows, and out-of-range input is rejected harmlessly.
+  await page.getByRole("button", { name: "Show controls" }).click()
   await expect(page.getByText(/120 \/ 604/)).toBeVisible()
   await pageInput.fill("999")
   await pageInput.press("Enter")
@@ -31,6 +35,7 @@ test("searches Arabic without diacritics and jumps to the verse's page", async (
   await page.goto("/", { waitUntil: "domcontentloaded" })
   await page.waitForSelector('.sheet[data-page="1"] .mushaf.ready', { timeout: 20000 })
 
+  await page.getByRole("button", { name: "Show controls" }).click()
   const search = page.getByLabel("Search Quran")
   await search.fill("برب الفلق")
   await expect(page.getByText("Search results")).toBeVisible({ timeout: 10000 })
@@ -47,6 +52,7 @@ test("searches a verse by its recalled common spelling", async ({ page }) => {
   await page.goto("/", { waitUntil: "domcontentloaded" })
   await page.waitForSelector('.sheet[data-page="1"] .mushaf.ready', { timeout: 20000 })
 
+  await page.getByRole("button", { name: "Show controls" }).click()
   // The Uthmani script writes مَٰلِكِ with a dagger alif; users recall ملك.
   const search = page.getByLabel("Search Quran")
   await search.fill("ملك يوم الدين")
@@ -61,6 +67,7 @@ test("ayah list virtualizes the mushaf and selects on tap", async ({ page }) => 
   await page.goto("/", { waitUntil: "domcontentloaded" })
   await page.waitForSelector('.sheet[data-page="1"] .mushaf.ready', { timeout: 20000 })
 
+  await page.getByRole("button", { name: "Show controls" }).click()
   await page.getByRole("button", { name: "Ayah list" }).click()
 
   // Virtualization: only a window of the 6236 verses exists in the DOM.
@@ -78,5 +85,6 @@ test("ayah list virtualizes the mushaf and selects on tap", async ({ page }) => 
   // Tapping a verse selects it; the list stays open for further picks.
   await page.locator("article").first().locator("button").click()
   await expect(page.getByRole("status")).toContainText("selected")
+  await page.getByRole("button", { name: "Show controls" }).click()
   await expect(page.getByRole("button", { name: "Mushaf" })).toBeVisible()
 })

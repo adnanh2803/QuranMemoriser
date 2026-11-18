@@ -16,6 +16,10 @@ import {
   type SurahSummary,
   type VerseKey,
 } from "../../../domain/schemas"
+import AudioBar from "../../audio/components/AudioBar.svelte"
+import { ayahUrl, RECITERS } from "../../audio/data/audio-repository"
+import { AudioPlayer } from "../../audio/model/player.svelte"
+import { tracksForJuz, tracksForSurah } from "../../audio/model/playlists"
 import {
   type BookmarkRepository,
   type WordRangeBookmark,
@@ -23,16 +27,12 @@ import {
 } from "../data/bookmark-repository"
 import type { CommandContext, MushafRepository } from "../data/mushaf-repository"
 import type { PageFontRegistry } from "../data/page-fonts"
-import AudioBar from "../../audio/components/AudioBar.svelte"
-import { RECITERS, ayahUrl } from "../../audio/data/audio-repository"
-import { tracksForJuz, tracksForSurah } from "../../audio/model/playlists"
-import { AudioPlayer } from "../../audio/model/player.svelte"
 import {
   dispatchSelection,
   ExtendRun,
   type RunCandidate,
-  type SelectionRun,
   type SelectionEngine,
+  type SelectionRun,
   TapRun,
 } from "../model/selection.svelte"
 import type { WordLedger } from "../model/word-ledger"
@@ -67,7 +67,7 @@ let searchLoading = $state(false)
 let searchError = $state<string | null>(null)
 let loadError = $state<string | null>(null)
 let listView = $state(false)
-let mobileHeaderOpen = $state(false)
+let menuOpen = $state(false)
 let pageInput = $state("1")
 let bookmarksOpen = $state(false)
 let savedBookmarks = $state<VerseKey[]>([])
@@ -91,6 +91,7 @@ const chunks = new SvelteMap<number, PageChunk>()
 let ledger = $state<WordLedger | null>(null)
 
 const juz = $derived(meta ? repository.juzOfPage(current, meta) : null)
+const hizb = $derived(meta ? repository.hizbOfPage(current, meta) : null)
 const currentSurah = $derived(surahOfPage(current))
 const downloadSummary = $derived(surahs.find((item) => item.surah === downloadSurah) ?? null)
 const currentDownload = $derived(
@@ -226,6 +227,7 @@ function showPage(page: number): void {
   current = target
   pageInput = String(target)
   listView = false
+  menuOpen = false
   localStorage.setItem(LAST_PAGE_KEY, String(target))
 }
 
@@ -256,6 +258,7 @@ function surahOfPage(page: number): SurahSummary | null {
 function playCurrentSurah(): void {
   const summary = currentSurah
   if (summary === null) return
+  menuOpen = false
   player.play(tracksForSurah(summary.surah, summary.verseCount), {
     kind: "surah",
     label: summary.name,
@@ -302,8 +305,11 @@ async function downloadSelectedSurah(): Promise<void> {
   const summary = downloadSummary
   if (
     summary === null ||
-    (downloadProgress !== null && downloadProgress.done < downloadProgress.total && downloadProgress.error === null)
-  ) return
+    (downloadProgress !== null &&
+      downloadProgress.done < downloadProgress.total &&
+      downloadProgress.error === null)
+  )
+    return
   if (!("caches" in globalThis)) {
     downloadProgress = {
       surah: summary.surah,
@@ -361,6 +367,7 @@ async function downloadSelectedSurah(): Promise<void> {
 function playCurrentJuz(): void {
   const juzNumber = juz
   if (juzNumber === null) return
+  menuOpen = false
   repository
     .ayahs()
     .then((all) => {
@@ -390,6 +397,7 @@ function openList(): void {
 }
 
 function toggleView(): void {
+  menuOpen = false
   if (!listView) {
     openList()
     return
@@ -430,7 +438,9 @@ function jumpToWordBookmark(range: WordRangeBookmark): void {
   repository
     .ayahs()
     .then((all) => {
-      const ayah = all.find((item) => item.surah === range.start.surah && item.ayah === range.start.ayah)
+      const ayah = all.find(
+        (item) => item.surah === range.start.surah && item.ayah === range.start.ayah,
+      )
       if (ayah) {
         bookmarksOpen = false
         showPage(ayah.page)
@@ -534,15 +544,16 @@ function cycleTheme(): void {
 <div
   class="relative flex h-[100svh] flex-col overflow-hidden bg-bg text-ink"
 >
-  {#if mobileHeaderOpen}
+  {#if menuOpen}
     <button
-      class="fixed inset-0 z-30 bg-black/25 md:hidden"
-      onclick={() => (mobileHeaderOpen = false)}
-      aria-label="Close controls"
+      class="fixed inset-0 z-30 bg-black/25"
+      onclick={() => (menuOpen = false)}
+      aria-label="Dismiss menu"
     ></button>
   {/if}
   <header
-    class="{mobileHeaderOpen ? 'fixed inset-y-0 right-0 z-40 flex w-[min(22rem,88vw)] flex-col gap-y-3 overflow-y-auto border-l border-hairline bg-surface px-4 py-4 shadow-xl' : 'hidden'} md:relative md:inset-auto md:z-10 md:grid md:w-auto md:shrink-0 md:grid-cols-[auto_minmax(0,1fr)] md:items-center md:gap-x-4 md:gap-y-2 md:overflow-visible md:border-l-0 md:border-b md:bg-surface/95 md:px-6 md:py-2 md:shadow-sm md:backdrop-blur-md"
+    id="reader-menu"
+    class="{menuOpen ? 'fixed inset-y-0 right-0 z-40 flex w-[min(22rem,88vw)] flex-col gap-y-3 overflow-y-auto border-l border-hairline bg-surface px-4 py-4 shadow-xl' : 'hidden'}"
   >
     <div class="flex w-full min-w-0 items-center gap-2.5">
       <img
@@ -557,13 +568,13 @@ function cycleTheme(): void {
         </div>
       </div>
       <button
-        class="ml-auto rounded-lg p-2 text-ink-muted transition hover:bg-accent-soft hover:text-accent md:hidden"
-        onclick={() => (mobileHeaderOpen = false)}
-        aria-label="Hide controls"
-        title="Hide controls"
+        class="ml-auto rounded-lg p-2 text-ink-muted transition hover:bg-accent-soft hover:text-accent"
+        onclick={() => (menuOpen = false)}
+        aria-label="Close menu"
+        title="Close menu"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="m6 9 6 6 6-6"></path>
+          <path d="M18 6 6 18M6 6l12 12"></path>
         </svg>
       </button>
     </div>
@@ -835,11 +846,13 @@ function cycleTheme(): void {
     </div>
   </header>
 
-  {#if !mobileHeaderOpen}
+  {#if !menuOpen}
     <button
-      class="absolute top-[max(0.5rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] z-20 rounded-xl border border-hairline bg-surface/95 p-2 text-ink-muted shadow-md backdrop-blur-md transition hover:bg-accent-soft hover:text-accent md:hidden"
-      onclick={() => (mobileHeaderOpen = true)}
+      class="absolute top-[max(0.5rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] z-20 rounded-xl border border-hairline bg-surface/95 p-2 text-ink-muted shadow-md backdrop-blur-md transition hover:bg-accent-soft hover:text-accent"
+      onclick={() => (menuOpen = true)}
       aria-label="Show controls"
+      aria-expanded={menuOpen}
+      aria-controls="reader-menu"
       title="Show controls"
     >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -872,6 +885,7 @@ function cycleTheme(): void {
               page={current}
               chunk={chunks.get(current) ?? null}
               {juz}
+              {hizb}
               {fitBody}
               {centreBelow}
               {fonts}

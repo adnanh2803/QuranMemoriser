@@ -670,9 +670,27 @@ async function main(): Promise<void> {
   const ayahs = buildAyahs(sources, walk, ayahKeys)
   surahsFileSchema.parse(surahs)
   ayahsFileSchema.parse(ayahs)
+  const ayahByKey = new Map<string, AyahMeta>()
+  for (const ayah of ayahs) ayahByKey.set(`${ayah.surah}:${ayah.ayah}`, ayah)
+  const pageHizbs = Array<number>(604).fill(0)
+  for (const chunk of builtChunks) {
+    for (const line of chunk.lines) {
+      if (line.kind !== "words") continue
+      const firstWord = line.words[0]
+      if (!firstWord) continue
+      const ayah = ayahByKey.get(`${firstWord.s}:${firstWord.a}`)
+      if (!ayah) throw new Error(`Missing ayah metadata for ${firstWord.s}:${firstWord.a}`)
+      pageHizbs[chunk.page - 1] = ayah.hizb
+      break
+    }
+    if (pageHizbs[chunk.page - 1] === 0) {
+      throw new Error(`Missing first ayah on page ${chunk.page}`)
+    }
+  }
 
   const meta = {
     juzPages: sources.layout.juzPages,
+    pageHizbs,
     fit: {
       body: sources.layout.fit?.body.v1,
       centreBelow: sources.layout.fit?.centreBelow.v1,
