@@ -65,7 +65,7 @@ test("plays only the selected words of a verse", async ({ page }) => {
   await expect(dock(page)).toContainText("Word-level playback ready")
 })
 
-test("downloads one chosen reciter for a surah and removes it", async ({ page }) => {
+test("downloads one chosen reciter for several surahs and removes them", async ({ page }) => {
   await page.getByRole("button", { name: "Show controls" }).click()
   await page.getByRole("button", { name: "Open offline recitations" }).click()
 
@@ -75,18 +75,36 @@ test("downloads one chosen reciter for a surah and removes it", async ({ page })
   await expect(dialog.locator('[data-word-playback="yes"]')).toHaveCount(11)
   await expect(dialog.locator('[data-word-playback="no"]')).toContainText("Abdurrahman As-Sudais")
 
+  const fatihah = dialog.locator('[data-surah="1"] input[type="checkbox"]')
+  await expect(fatihah).toBeChecked()
+
+  await dialog.getByRole("searchbox", { name: "Find a surah" }).fill("Ikhlas")
+  const ikhlas = dialog.locator('[data-surah="112"] input[type="checkbox"]')
+  await expect(dialog.locator('[data-surah="112"]')).toBeVisible()
+  await ikhlas.check()
+  await expect(dialog.getByText(/2 selected · 11 ayahs/)).toBeVisible()
+
   await dialog.getByRole("button", { name: "Download selected" }).click()
   await expect(dialog.getByRole("status")).toHaveText(
-    "All selected reciters are saved for offline playback.",
+    "All selected recitations are saved for offline playback.",
     { timeout: 15000 },
   )
 
-  const saved = dialog.locator('[data-saved-recitation="alafasy"]')
-  await expect(saved).toContainText("7 of 7 ayahs")
-  await expect(saved).toContainText("Complete")
+  const savedFatihah = dialog.locator('[data-saved-surah="1"] [data-saved-recitation="alafasy"]')
+  const savedIkhlas = dialog.locator('[data-saved-surah="112"] [data-saved-recitation="alafasy"]')
+  await expect(savedFatihah).toContainText("7 of 7 ayahs")
+  await expect(savedFatihah).toContainText("Complete")
+  await expect(savedIkhlas).toContainText("4 of 4 ayahs")
+  await expect(savedIkhlas).toContainText("Complete")
 
-  await dialog.getByRole("button", { name: "Remove Mishary Alafasy for this surah" }).click()
-  await expect(dialog.getByText("No recitations are saved for this surah yet.")).toBeVisible()
+  await dialog.getByRole("button", { name: "Remove Mishary Alafasy for Al-Fatihah" }).click()
+  await expect(dialog.locator('[data-saved-surah="1"]')).toHaveCount(0)
+  await expect(savedIkhlas).toBeVisible()
+
+  await dialog.getByRole("button", { name: "Remove Mishary Alafasy for Al-Ikhlas" }).click()
+  await expect(
+    dialog.getByText("No recitations are saved for the selected surahs yet."),
+  ).toBeVisible()
 })
 
 test("plays the whole surah and walks it ayah by ayah", async ({ page }) => {
