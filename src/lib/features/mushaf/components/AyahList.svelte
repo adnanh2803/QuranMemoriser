@@ -40,8 +40,13 @@ function measureElement(element: HTMLElement): void {
       {@const key = verseKey(ayah.surah, ayah.ayah)}
       {@const isBookmarked = bookmarkedSet.has(key)}
       <article
-        class="absolute left-3 right-3 rounded-xl border border-hairline bg-surface px-4 py-3 shadow-sm {isBookmarked ? 'border-accent/50' : ''}"
-        class:bg-accent-soft={selection.has(key) || isBookmarked}
+        class="absolute left-3 right-3 rounded-xl border px-4 py-3 shadow-sm {isBookmarked
+          ? 'border-bookmark/45'
+          : 'border-hairline'} {selection.has(key)
+          ? 'bg-accent-soft'
+          : isBookmarked
+            ? 'bg-bookmark-soft'
+            : 'bg-surface'}"
         data-index={item.index}
         use:measureElement
         style="top: 0; transform: translateY({item.start}px)"
@@ -55,7 +60,7 @@ function measureElement(element: HTMLElement): void {
                 height="14"
                 viewBox="0 0 24 24"
                 fill="currentColor"
-                class="text-accent"
+                class="text-bookmark"
                 role="img"
                 aria-label="Bookmarked"
               >

@@ -152,6 +152,7 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
       }
     }
     updateSelectionRunWidths(el)
+    updateBookmarkRunWidths(el)
   }
 
   function updateSelectionRunWidths(el: HTMLElement): void {
@@ -182,6 +183,36 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
     }
   }
 
+  /** One saved strip per printed line segment, measured from its words. */
+  function updateBookmarkRunWidths(el: HTMLElement): void {
+    for (const line of el.querySelectorAll<HTMLElement>(".m-line.m-ayah")) {
+      const words = Array.from(line.querySelectorAll<HTMLElement>(".m-word"))
+      for (let index = 0; index < words.length; index++) {
+        const start = words[index]
+        if (!start?.classList.contains("m-bookmark-start")) continue
+        let end = index
+        while (end + 1 < words.length) {
+          const next = words[end + 1]
+          if (
+            !next ||
+            !(next.classList.contains("m-bookmarked") || next.classList.contains("m-word-bookmarked"))
+          ) {
+            break
+          }
+          end++
+        }
+        const finish = words[end]
+        if (!finish) continue
+        const firstRect = start.getBoundingClientRect()
+        const lastRect = finish.getBoundingClientRect()
+        start.style.setProperty(
+          "--m-bookmark-run-width",
+          `${Math.max(firstRect.right - lastRect.left, firstRect.width)}px`,
+        )
+      }
+    }
+  }
+
   // The settle ratio (line width over measure) survives a resize; re-run to
   // re-derive the shrunk percentages and the short-line threshold.
   $effect(() => {
@@ -203,6 +234,14 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
     const el = box
     if (!el || !fontReady) return
     requestAnimationFrame(() => updateSelectionRunWidths(el))
+  })
+
+  $effect(() => {
+    void bookmarkedKeys
+    void bookmarkedWordRanges
+    const el = box
+    if (!el || !fontReady) return
+    requestAnimationFrame(() => updateBookmarkRunWidths(el))
   })
 
   const wordIdentity = (word: MushafWord): WordIdentity => ({
@@ -276,6 +315,13 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
         (range) => compareWordRefs(ref, range.start) >= 0 && compareWordRefs(ref, range.end) <= 0,
       )
     )
+  }
+  /** The first saved word of a printed line: where the bookmark tab sits. */
+  const isBookmarkStart = (words: MushafWord[], index: number): boolean => {
+    const word = words[index]
+    if (!word || !(isBookmarked(word) || isWordBookmarked(word))) return false
+    const previous = words[index - 1]
+    return index === 0 || !previous || !(isBookmarked(previous) || isWordBookmarked(previous))
   }
   /** The word a tap has marked as the selection's start, waiting for the end. */
   const isPending = (word: MushafWord): boolean => {
@@ -386,6 +432,7 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
                 class:m-selected={isSelected(word)}
                 class:m-bookmarked={isBookmarked(word)}
                 class:m-word-bookmarked={isWordBookmarked(word)}
+                class:m-bookmark-start={isBookmarkStart(line.words, index)}
                 class:m-pending={isPending(word)}
                 class:m-selected-start={isSelectedStart(line.words, index)}
                 class:m-selected-end={isSelectedEnd(line.words, index)}

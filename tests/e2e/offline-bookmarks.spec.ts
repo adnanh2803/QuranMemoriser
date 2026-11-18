@@ -24,8 +24,20 @@ test("bookmarks a selection and jumps back to it", async ({ page }) => {
   await page.getByRole("button", { name: "Show controls" }).click()
   await page.getByRole("button", { name: /Bookmarks/ }).click()
   await expect(page.getByText("No bookmarks yet")).toHaveCount(0)
+  await expect(page.getByText("Al-Falaq", { exact: true })).toBeVisible()
   await page.getByRole("button", { name: "113:1", exact: true }).click()
   await expect(page.locator('.sheet[data-page="604"]')).toBeVisible()
+
+  // The saved verse wears its bookmark strip on the page.
+  const strip = page.locator('.sheet[data-page="604"] .m-word.m-bookmark-start')
+  await expect(strip).toHaveCount(1)
+  await expect
+    .poll(async () =>
+      Number.parseFloat(
+        await strip.evaluate((el) => el.style.getPropertyValue("--m-bookmark-run-width")),
+      ),
+    )
+    .toBeGreaterThan(0)
 
   // Removing it empties the panel (the jump closed it; reopen first).
   await page.getByRole("button", { name: "Show controls" }).click()

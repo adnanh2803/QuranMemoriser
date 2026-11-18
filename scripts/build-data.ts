@@ -36,8 +36,8 @@
  * Run with:  node scripts/build-data.ts
  */
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises"
-import { inflateRawSync } from "node:zlib"
 import path from "node:path"
+import { inflateRawSync } from "node:zlib"
 
 import {
   type ApiChapter,
@@ -527,7 +527,10 @@ interface AlignmentRow {
   segments: [number, number, number, number][]
 }
 
-function readAlignment(archive: Buffer, filename: string): Record<string, AlignmentRow["segments"]> {
+function readAlignment(
+  archive: Buffer,
+  filename: string,
+): Record<string, AlignmentRow["segments"]> {
   const rows = JSON.parse(zipEntry(archive, filename).toString("utf8")) as AlignmentRow[]
   const timings: Record<string, AlignmentRow["segments"]> = {}
   for (const row of rows) {
@@ -540,7 +543,11 @@ function readAlignment(archive: Buffer, filename: string): Record<string, Alignm
     if (!Array.isArray(row.segments)) {
       throw new Error(`quran-align ${filename} contains malformed segments`)
     }
-    if (row.segments.some((segment) => segment.length !== 4 || segment.some((part) => !Number.isFinite(part)))) {
+    if (
+      row.segments.some(
+        (segment) => segment.length !== 4 || segment.some((part) => !Number.isFinite(part)),
+      )
+    ) {
       throw new Error(`quran-align ${filename} contains a malformed segment`)
     }
     timings[`${row.surah}:${row.ayah}`] = row.segments
@@ -658,10 +665,7 @@ async function main(): Promise<void> {
   ] as const
   const timingBytes = await Promise.all(
     timingFiles.map(([name, filename]) =>
-      writeJson(
-        path.join(OUT_TIMINGS, `${name}.json`),
-        readAlignment(alignmentArchive, filename),
-      ),
+      writeJson(path.join(OUT_TIMINGS, `${name}.json`), readAlignment(alignmentArchive, filename)),
     ),
   )
 
@@ -752,7 +756,9 @@ async function main(): Promise<void> {
   console.log(`surahs.json: ${(surahsBytes / 1024).toFixed(1)} KB`)
   console.log(`ayahs.json: ${(ayahsBytes / 1024).toFixed(1)} KB`)
   console.log(`word-index.json: ${(wordIndexBytes / 1024).toFixed(1)} KB`)
-  console.log(`word timings: ${(timingBytes.reduce((sum, bytes) => sum + bytes, 0) / 1024).toFixed(1)} KB`)
+  console.log(
+    `word timings: ${(timingBytes.reduce((sum, bytes) => sum + bytes, 0) / 1024).toFixed(1)} KB`,
+  )
   console.log(`meta.json: ${(metaBytes / 1024).toFixed(1)} KB`)
   console.log(`page chunks: ${(totalChunkBytes / 1024 / 1024).toFixed(2)} MB (604 files)`)
   console.log(`fonts copied: ${fontCount} page fonts + basmalah + sura-names + uthmanic-hafs`)

@@ -115,6 +115,29 @@ function wordRangeLabel(range: SelectionRun): string {
   return `${start}–${end}`
 }
 
+function surahNameOf(surah: number): string {
+  return surahs.find((item) => item.surah === surah)?.name ?? `Surah ${surah}`
+}
+
+function verseSurah(key: VerseKey): string {
+  const surah = Number.parseInt(key, 10)
+  return Number.isNaN(surah) ? key : surahNameOf(surah)
+}
+
+function wordRangeTitle(range: SelectionRun): string {
+  const start = `${range.start.surah}:${range.start.ayah}`
+  const end = `${range.end.surah}:${range.end.ayah}`
+  const span = start === end ? start : `${start}–${end}`
+  return `${span} · words ${range.start.word}–${range.end.word}`
+}
+
+function wordRangeSurahs(range: SelectionRun): string {
+  const first = surahNameOf(range.start.surah)
+  return range.start.surah === range.end.surah
+    ? first
+    : `${first} – ${surahNameOf(range.end.surah)}`
+}
+
 function restorePage(): number {
   const saved = Number.parseInt(localStorage.getItem(LAST_PAGE_KEY) ?? "", 10)
   return saved >= 1 && saved <= PAGE_COUNT ? saved : 1
@@ -798,36 +821,106 @@ function cycleTheme(): void {
         </span>
       </button>
       {#if bookmarksOpen}
-        <div class="absolute right-0 top-full z-30 mt-2 max-h-80 w-64 overflow-auto rounded-xl border border-hairline bg-surface-raised p-2 shadow-xl ring-1 ring-black/5">
+        <div
+          class="absolute right-0 top-full z-30 mt-2 max-h-80 w-72 overflow-auto rounded-xl border border-hairline bg-surface-raised p-2 shadow-xl ring-1 ring-black/5"
+        >
           {#if savedBookmarkCount === 0}
-            <p class="p-2 text-sm text-ink-muted">No bookmarks yet</p>
+            <div class="flex items-start gap-2.5 px-2.5 py-3">
+              <span class="mt-1 h-7 w-[3px] shrink-0 rounded-full bg-hairline" aria-hidden="true"
+              ></span>
+              <div>
+                <p class="text-sm font-medium">No bookmarks yet</p>
+                <p class="mt-0.5 text-xs leading-relaxed text-ink-muted">
+                  Select an ayah or a phrase, then tap the bookmark in the selection bar.
+                </p>
+              </div>
+            </div>
           {:else}
-            {#each savedBookmarks as key (key)}
-              <div class="flex items-center gap-1">
-                <button class="flex-1 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent-soft" onclick={() => jumpToBookmark(key)}>{key}</button>
-                <button class="rounded px-2 py-1 text-ink-muted hover:bg-accent-soft" aria-label="Remove bookmark {key}" onclick={() => removeBookmark(key)}>×</button>
-              </div>
-            {/each}
-            {#each savedWordBookmarks as range (wordRangeBookmarkKey(range))}
-              {@const label = wordRangeLabel(range)}
-              <div class="flex items-center gap-1">
-                <button
-                  class="flex-1 rounded-lg px-3 py-2 text-left text-sm leading-snug hover:bg-accent-soft"
-                  onclick={() => jumpToWordBookmark(range)}
-                  title="Go to bookmarked word range"
-                >
-                  <span class="mr-1 text-[10px] font-semibold text-accent uppercase">Words</span>
-                  {label}
-                </button>
-                <button
-                  class="rounded px-2 py-1 text-ink-muted hover:bg-accent-soft"
-                  aria-label="Remove word bookmark {label}"
-                  onclick={() => removeWordBookmark(range)}
-                >
-                  ×
-                </button>
-              </div>
-            {/each}
+            {#if savedBookmarks.length > 0}
+              <p
+                class="px-2.5 pt-2 pb-1 text-[10px] font-semibold tracking-[0.14em] text-ink-muted uppercase"
+              >
+                Verses
+              </p>
+              {#each savedBookmarks as key (key)}
+                <div class="flex items-center gap-0.5">
+                  <button
+                    class="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg py-1.5 pr-1 pl-2 text-left transition hover:bg-accent-soft"
+                    onclick={() => jumpToBookmark(key)}
+                    aria-label={key}
+                    title={`${key} · ${verseSurah(key)}`}
+                  >
+                    <span class="h-7 w-[3px] shrink-0 rounded-full bg-bookmark" aria-hidden="true"
+                    ></span>
+                    <span class="min-w-0">
+                      <span class="block text-sm font-medium">{key}</span>
+                      <span class="block truncate text-[11px] text-ink-muted">{verseSurah(key)}</span>
+                    </span>
+                  </button>
+                  <button
+                    class="rounded-lg p-2 text-ink-muted transition hover:bg-accent-soft hover:text-ink"
+                    aria-label="Remove bookmark {key}"
+                    onclick={() => removeBookmark(key)}
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 14 14"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                      stroke-linecap="round"
+                    >
+                      <path d="m3.5 3.5 7 7M10.5 3.5l-7 7"></path>
+                    </svg>
+                  </button>
+                </div>
+              {/each}
+            {/if}
+            {#if savedWordBookmarks.length > 0}
+              <p
+                class="px-2.5 pt-3 pb-1 text-[10px] font-semibold tracking-[0.14em] text-ink-muted uppercase"
+              >
+                Word ranges
+              </p>
+              {#each savedWordBookmarks as range (wordRangeBookmarkKey(range))}
+                {@const title = wordRangeTitle(range)}
+                <div class="flex items-center gap-0.5">
+                  <button
+                    class="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg py-1.5 pr-1 pl-2 text-left transition hover:bg-accent-soft"
+                    onclick={() => jumpToWordBookmark(range)}
+                    aria-label={title}
+                    title={`${title} · ${wordRangeSurahs(range)}`}
+                  >
+                    <span class="h-7 w-[3px] shrink-0 rounded-full bg-bookmark" aria-hidden="true"
+                    ></span>
+                    <span class="min-w-0">
+                      <span class="block truncate text-sm font-medium">{title}</span>
+                      <span class="block truncate text-[11px] text-ink-muted"
+                        >{wordRangeSurahs(range)}</span
+                      >
+                    </span>
+                  </button>
+                  <button
+                    class="rounded-lg p-2 text-ink-muted transition hover:bg-accent-soft hover:text-ink"
+                    aria-label="Remove word bookmark {wordRangeLabel(range)}"
+                    onclick={() => removeWordBookmark(range)}
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 14 14"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                      stroke-linecap="round"
+                    >
+                      <path d="m3.5 3.5 7 7M10.5 3.5l-7 7"></path>
+                    </svg>
+                  </button>
+                </div>
+              {/each}
+            {/if}
           {/if}
         </div>
       {/if}

@@ -167,16 +167,37 @@
   cursor: pointer;
 }
 
-/* A saved bookmark remains visible after the temporary selection is cleared. */
-.m-word.m-bookmarked {
-  border-radius: 0.1em;
-  box-shadow: inset 0 -0.035em color-mix(in srgb, var(--accent) 42%, transparent);
+/* A saved verse or word range reads as a warm strip laid behind its printed
+   line segment — one strip per line, measured from the run's words like the
+   selection bar, with a tab marking where the saved run begins. A live
+   selection paints over it, so the saved strip steps aside. */
+.m-word.m-bookmark-start:not(.m-selected)::before {
+  position: absolute;
+  z-index: -1;
+  inset-block: 0.13em;
+  inset-inline-start: -0.18em;
+  width: calc(var(--m-bookmark-run-width, 100%) + 0.36em);
+  border-radius: 0.22em;
+  background-color: var(--bookmark-wash);
+  background-image: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--bookmark) 48%, transparent) 0 0.045em,
+    transparent 0.045em
+  );
+  content: "";
+  pointer-events: none;
 }
 
-.m-word.m-word-bookmarked {
-  border-radius: 0.12em;
-  background-color: color-mix(in srgb, var(--accent-soft) 42%, transparent);
-  box-shadow: inset 0 -0.04em color-mix(in srgb, var(--accent) 48%, transparent);
+.m-word.m-bookmark-start:not(.m-pending)::after {
+  position: absolute;
+  z-index: -1;
+  inset-block: 0.06em;
+  inset-inline-start: -0.18em;
+  width: 0.085em;
+  border-radius: 999px;
+  background: var(--bookmark);
+  content: "";
+  pointer-events: none;
 }
 
 /* Selected ayahs read as a highlighter bar: shorter than the line box so it
