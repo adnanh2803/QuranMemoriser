@@ -76,6 +76,7 @@ test("downloads one chosen reciter for several surahs and removes them", async (
   await expect(dialog.locator('[data-word-playback="no"]')).toContainText("Abdurrahman As-Sudais")
 
   const fatihah = dialog.locator('[data-surah="1"] input[type="checkbox"]')
+  await fatihah.check()
   await expect(fatihah).toBeChecked()
 
   await dialog.getByRole("searchbox", { name: "Find a surah" }).fill("Ikhlas")
@@ -112,6 +113,10 @@ test("plays downloaded audio with the network cut off", async ({ page }) => {
   await page.getByRole("button", { name: "Open offline recitations" }).click()
 
   const dialog = page.getByRole("dialog", { name: "Offline recitations" })
+  await expect(dialog.getByRole("checkbox", { name: /Mishary Alafasy/ })).toBeChecked()
+  const fatihah = dialog.locator('[data-surah="1"] input[type="checkbox"]')
+  await fatihah.check()
+  await expect(fatihah).toBeChecked()
   await dialog.getByRole("button", { name: "Download selected" }).click()
   await expect(dialog.getByRole("status")).toHaveText(
     "All selected recitations are saved for offline playback.",
