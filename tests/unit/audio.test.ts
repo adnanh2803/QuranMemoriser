@@ -16,6 +16,10 @@ import {
   tracksForSurah,
 } from "../../src/lib/features/audio/model/playlists"
 import {
+  buildSelectionPlaylist,
+  selectionPlaybackLabel,
+} from "../../src/lib/features/audio/model/selection-playback"
+import {
   hasWordTimings,
   type VerseWordTimings,
   wordTimingsPath,
@@ -24,6 +28,7 @@ import type {
   CommandContext,
   WordIdentity,
 } from "../../src/lib/features/mushaf/data/mushaf-repository"
+import { SelectionEngine } from "../../src/lib/features/mushaf/model/selection.svelte"
 
 /** An index over the first three surahs (7 + 286 + 200) for key lookups. */
 const VERSE_COUNTS = [7, 286, 200]
@@ -374,5 +379,67 @@ describe("stored reciter", () => {
   it("falls back to the default when nothing valid was saved", () => {
     localStorage.setItem("qm.reciter", "nonsense")
     expect(storedReciterId()).toBe("alafasy")
+  })
+})
+
+describe("selection playback", () => {
+  function engineFor(wholeVerses: boolean): SelectionEngine {
+    const engine = new SelectionEngine()
+    engine.setRun(
+      {
+        start: { surah: 1, ayah: 1, word: wholeVerses ? 1 : 2 },
+        end: { surah: 1, ayah: 1, word: wholeVerses ? 7 : 3 },
+      },
+      wholeVerses ? 7 : 2,
+      ["1:1"],
+      wholeVerses,
+    )
+    return engine
+  }
+
+  it("names verse and word selections for the dock", () => {
+    expect(selectionPlaybackLabel(engineFor(true))).toBe("1:1 selected")
+    expect(selectionPlaybackLabel(engineFor(false))).toBe("2 words selected")
+  })
+
+  it("bumps a revision for every selection change", () => {
+    const engine = new SelectionEngine()
+    expect(engine.revision).toBe(0)
+    engine.setPending({ surah: 1, ayah: 1, word: 1 })
+    expect(engine.revision).toBe(1)
+    engine.setRun(
+      { start: { surah: 1, ayah: 1, word: 1 }, end: { surah: 1, ayah: 1, word: 7 } },
+      7,
+      ["1:1"],
+      true,
+    )
+    expect(engine.revision).toBe(2)
+    engine.clear()
+    expect(engine.revision).toBe(3)
+  })
+
+  it("builds a whole-verse selection playlist for the current reciter", async () => {
+    const result = await buildSelectionPlaylist(
+      Promise.resolve(context),
+      engineFor(true),
+      "alafasy",
+    )
+    expect(result).toEqual({
+      ok: true,
+      tracks: [{ key: "1:1", surah: 1, ayah: 1 }],
+      label: "1:1 selected",
+    })
+  })
+
+  it("refuses a word selection for a reciter without word timings", async () => {
+    const result = await buildSelectionPlaylist(
+      Promise.resolve(context),
+      engineFor(false),
+      "sudais",
+    )
+    expect(result).toEqual({
+      ok: false,
+      error: "Word-level playback is unavailable for Abdurrahman As-Sudais",
+    })
   })
 })

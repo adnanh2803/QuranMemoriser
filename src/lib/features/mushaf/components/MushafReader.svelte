@@ -21,6 +21,7 @@ import OfflineAudioDialog from "../../audio/components/OfflineAudioDialog.svelte
 import type { OfflineAudioRepository } from "../../audio/data/offline-audio-repository"
 import { AudioPlayer } from "../../audio/model/player.svelte"
 import { tracksForJuz, tracksForSurah } from "../../audio/model/playlists"
+import { buildSelectionPlaylist } from "../../audio/model/selection-playback"
 import {
   type BookmarkRepository,
   type WordRangeBookmark,
@@ -82,6 +83,66 @@ const player = new AudioPlayer(
   () => new Audio(),
   (url) => offlineAudio.localPlaybackUrl(url),
 )
+
+/** While a selection playlist is open, a new selection replaces its tracks. */
+let lastSelectionRevision = -1
+let suppressSelectionPlay = false
+
+function selectionPlayStarted(): void {
+  suppressSelectionPlay = true
+}
+
+$effect(() => {
+  const isSelectionPlaylist = player.active && player.source?.kind === "selection"
+  const revision = selection.revision
+  if (!isSelectionPlaylist || selection.run === null) {
+    lastSelectionRevision = -1
+    return
+  }
+  if (revision === lastSelectionRevision) return
+  if (suppressSelectionPlay) {
+    suppressSelectionPlay = false
+    lastSelectionRevision = revision
+    return
+  }
+  lastSelectionRevision = revision
+
+  const reciterId = player.reciterId
+  let cancelled = false
+  void buildSelectionPlaylist(context, selection, reciterId).then(
+    (result) => {
+      if (
+        cancelled ||
+        !player.active ||
+        player.source?.kind !== "selection" ||
+        selection.revision !== revision ||
+        player.reciterId !== reciterId
+      ) {
+        return
+      }
+      if (result === null) return
+      if (!result.ok) {
+        player.error = result.error
+        return
+      }
+      player.play(result.tracks, { kind: "selection", label: result.label })
+    },
+    () => {
+      if (
+        !cancelled &&
+        player.active &&
+        player.source?.kind === "selection" &&
+        player.reciterId === reciterId
+      ) {
+        player.error = "Could not prepare recitation"
+      }
+    },
+  )
+  return () => {
+    cancelled = true
+  }
+})
+
 /** All page chunks are loaded up front so page turns never wait on text data. */
 const chunks = new SvelteMap<number, PageChunk>()
 /** Slot indexes within verses, once every chunk has landed. */
@@ -844,17 +905,19 @@ function cycleTheme(): void {
     {/if}
   </main>
 
-  <SelectionBanner
-    {selection}
-    {repository}
-    {bookmarks}
-    {player}
-    {context}
-    raised={player.active}
-    onBookmarks={(keys) => (savedBookmarks = keys)}
-    onWordBookmarks={(ranges) => (savedWordBookmarks = ranges)}
-  />
-  <AudioBar {player} {surahs} />
+  {#if !player.active}
+    <SelectionBanner
+      {selection}
+      {repository}
+      {bookmarks}
+      {player}
+      {context}
+      onPlay={selectionPlayStarted}
+      onBookmarks={(keys) => (savedBookmarks = keys)}
+      onWordBookmarks={(ranges) => (savedWordBookmarks = ranges)}
+    />
+  {/if}
+  <AudioBar {player} {surahs} {selection} />
   <OfflineAudioDialog
     open={offlineAudioOpen}
     {surahs}

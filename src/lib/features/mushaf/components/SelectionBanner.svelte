@@ -5,8 +5,10 @@
 <script lang="ts">
 import { parseVerseKey, type VerseKey } from "../../../domain/schemas"
 import type { AudioPlayer } from "../../audio/model/player.svelte"
-import { tracksForKeys, tracksForSelection } from "../../audio/model/playlists"
-import { hasWordTimings, wordTimingsFor } from "../../audio/model/word-timings"
+import {
+  buildSelectionPlaylist,
+  selectionPlaybackLabel,
+} from "../../audio/model/selection-playback"
 import type { BookmarkRepository, WordRangeBookmark } from "../data/bookmark-repository"
 import type { CommandContext, MushafRepository } from "../data/mushaf-repository"
 import type { SelectionEngine } from "../model/selection.svelte"
@@ -18,8 +20,8 @@ interface Props {
   player: AudioPlayer
   /** The selection commands' context, resolved once playback starts. */
   context: Promise<CommandContext>
-  /** Lifted above the audio bar while a playlist is loaded. */
-  raised: boolean
+  /** Tells the reader a selection playlist was intentionally started. */
+  onPlay: () => void
   onBookmarks: (keys: VerseKey[]) => void
   onWordBookmarks: (ranges: WordRangeBookmark[]) => void
 }
@@ -30,7 +32,7 @@ let {
   bookmarks,
   player,
   context,
-  raised,
+  onPlay,
   onBookmarks,
   onWordBookmarks,
 }: Props = $props()
@@ -44,13 +46,7 @@ const pending = $derived(selection.pending)
 const pendingLabel = $derived(
   pending ? `${pending.surah}:${pending.ayah} · word ${pending.word} — tap the end` : "",
 )
-const selectionLabel = $derived.by(() => {
-  // A run that covers its verses from the first word to the end reads as
-  // verses; anything shorter reads by its printed slots.
-  if (!selection.wholeVerses) return `${count} ${count === 1 ? "word" : "words"} selected`
-  const keys = selection.verseKeys()
-  return keys.length === 1 ? `${keys[0]} selected` : `${keys.length} verses selected`
-})
+const selectionLabel = $derived(selectionPlaybackLabel(selection))
 
 function flash(message: string): void {
   copied = message
@@ -118,39 +114,15 @@ function clearSelection(): void {
 
 /** Play the selection's verses, verse by verse. */
 async function playSelected(): Promise<void> {
-  const keys = selection.verseKeys()
-  if (keys.length === 0) return
+  onPlay()
   try {
-    const commandContext = await context
-    let tracks = tracksForKeys(commandContext, keys)
-    if (tracks.length === 0) {
-      flash("No playable verses in this selection")
+    const result = await buildSelectionPlaylist(context, selection, player.reciterId)
+    if (result === null) return
+    if (!result.ok) {
+      flash(result.error)
       return
     }
-
-    if (!selection.wholeVerses) {
-      if (!hasWordTimings(player.reciterId)) {
-        flash(`Word-level playback is unavailable for ${player.reciter.label}`)
-        return
-      }
-      const run = selection.run
-      if (!run) return
-      const timings = await wordTimingsFor(player.reciterId)
-      const selectedTracks = tracksForSelection(commandContext, keys, run, timings)
-      if (!selectedTracks) {
-        flash("Word timing is unavailable for part of this selection")
-        return
-      }
-      tracks = selectedTracks
-    }
-    player.play(tracks, {
-      kind: "selection",
-      label: selection.wholeVerses
-        ? keys.length === 1
-          ? (keys[0] ?? "Selection")
-          : `${keys.length} verses`
-        : `${selection.size} selected words`,
-    })
+    player.play(result.tracks, { kind: "selection", label: result.label })
   } catch (error) {
     flash(error instanceof Error ? error.message : "Could not prepare recitation")
   }
@@ -174,7 +146,7 @@ function bookmarkSelected(): void {
 
 {#if count > 0 || pending}
   <div
-    class="pointer-events-none fixed {raised ? 'bottom-[20rem]' : 'bottom-6'} left-2 right-2 z-20 flex max-w-[calc(100vw-1rem)] flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-hairline/60 bg-surface-raised/70 px-3 py-2 shadow-md backdrop-blur-sm sm:right-auto sm:left-1/2 sm:w-max sm:-translate-x-1/2 sm:flex-nowrap sm:gap-2 sm:rounded-full sm:pr-2 sm:pl-4"
+    class="pointer-events-none fixed bottom-6 left-2 right-2 z-20 flex max-w-[calc(100vw-1rem)] flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-hairline/60 bg-surface-raised/70 px-3 py-2 shadow-md backdrop-blur-sm sm:right-auto sm:left-1/2 sm:w-max sm:-translate-x-1/2 sm:flex-nowrap sm:gap-2 sm:rounded-full sm:pr-2 sm:pl-4"
     role="status"
   >
     {#if pending}
@@ -240,7 +212,7 @@ function bookmarkSelected(): void {
 
 {#if copied !== null}
   <div
-    class="fixed {raised ? 'bottom-[24rem]' : 'bottom-22'} left-2 right-2 z-20 mx-auto w-fit max-w-[calc(100vw-1rem)] rounded-full border border-hairline bg-surface px-4 py-2 text-center text-xs text-ink shadow-md sm:right-auto sm:left-1/2 sm:-translate-x-1/2"
+    class="fixed bottom-22 left-2 right-2 z-20 mx-auto w-fit max-w-[calc(100vw-1rem)] rounded-full border border-hairline bg-surface px-4 py-2 text-center text-xs text-ink shadow-md sm:right-auto sm:left-1/2 sm:-translate-x-1/2"
   >
     {copied}
   </div>

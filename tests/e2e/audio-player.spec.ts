@@ -50,6 +50,26 @@ test("plays the selected verses from the banner", async ({ page }) => {
   await expect(dock(page)).toBeVisible()
   await expect(dock(page)).toContainText("1:1 · Al-Fatihah")
   await expect(dock(page)).toContainText("1 / 1")
+  await expect(dock(page)).toContainText("Selected")
+  await expect(page.getByRole("button", { name: "Play selected verses" })).toHaveCount(0)
+
+  await page.getByRole("button", { name: "Stop recitation" }).click()
+  await expect(dock(page)).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "Play selected verses" })).toBeVisible()
+})
+
+test("updates selection playback when verses are reselected", async ({ page }) => {
+  await page.locator('.m-word[data-s="1"][data-a="1"].m-end').click()
+  await page.getByRole("button", { name: "Play selected verses" }).click()
+  await expect(dock(page)).toContainText("1 / 1")
+
+  // A verse tap while the player is open extends the live selection; the
+  // player should replace its playlist instead of leaving the selection dock
+  // hidden with no way to start the new verses.
+  await page.locator('.m-word[data-s="1"][data-a="2"].m-end').click()
+  await expect(dock(page)).toContainText("2 verses selected")
+  await expect(dock(page)).toContainText("1 / 2")
+  await expect(page.getByRole("button", { name: "Play selected verses" })).toHaveCount(0)
 })
 
 test("plays only the selected words of a verse", async ({ page }) => {

@@ -141,6 +141,12 @@ export class SelectionEngine {
   private wordCountState = $state(0)
   private touchedState = $state<VerseKey[]>([])
   private wholeState = $state(false)
+  private revisionState = $state(0)
+
+  /** Changes once per user action, so listeners can react to a new selection. */
+  get revision(): number {
+    return this.revisionState
+  }
 
   /** The selected run, or null when nothing is selected. */
   get run(): SelectionRun | null {
@@ -199,6 +205,7 @@ export class SelectionEngine {
     this.wordCountState = 0
     this.touchedState = []
     this.wholeState = false
+    this.revisionState += 1
   }
 
   setRun(run: SelectionRun, words: number, touched: VerseKey[], whole: boolean): void {
@@ -207,6 +214,7 @@ export class SelectionEngine {
     this.wordCountState = words
     this.touchedState = touched
     this.wholeState = whole
+    this.revisionState += 1
   }
 
   clear(): void {
@@ -215,6 +223,7 @@ export class SelectionEngine {
     this.wordCountState = 0
     this.touchedState = []
     this.wholeState = false
+    this.revisionState += 1
   }
 }
 

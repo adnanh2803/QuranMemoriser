@@ -1,16 +1,21 @@
 <!-- The recitation dock: position, transport, speed, repeat and reciter controls. -->
 <script lang="ts">
 import type { SurahSummary } from "../../../domain/schemas"
+import type { SelectionEngine } from "../../mushaf/model/selection.svelte"
 import { RECITERS } from "../data/audio-repository"
 import type { AudioPlayer } from "../model/player.svelte"
+import { selectionSummary } from "../model/selection-playback"
 import { WORD_PLAYBACK_LABEL } from "../model/word-timings"
 
 interface Props {
   player: AudioPlayer
   surahs: SurahSummary[]
+  selection: SelectionEngine
 }
 
-let { player, surahs }: Props = $props()
+let { player, surahs, selection }: Props = $props()
+
+const selectionInfo = $derived(selection.run === null ? null : selectionSummary(selection))
 
 const label = $derived.by(() => {
   const track = player.current
@@ -46,6 +51,12 @@ function formatTime(seconds: number): string {
             <span class="shrink-0 rounded-full bg-bg px-2 py-0.5 text-xs tabular-nums text-ink-muted">{player.index + 1} / {player.tracks.length}</span>
           </div>
           <div class="mt-0.5 truncate text-sm text-ink-muted">{player.error ?? player.source?.label ?? player.reciter.label}</div>
+          {#if selectionInfo}
+            <div class="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] text-ink-muted">
+              <span class="shrink-0 rounded-full bg-accent-soft px-1.5 py-0.5 font-medium text-accent">Selected</span>
+              <span class="truncate">{selectionInfo}</span>
+            </div>
+          {/if}
         </div>
       </div>
       <button
