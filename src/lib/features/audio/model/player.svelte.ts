@@ -85,16 +85,19 @@ export class AudioPlayer {
   )
 
   /** Start a playlist from its first ayah, replacing whatever played. */
-  play(tracks: AudioTrack[], source: AudioSource): void {
+  play(tracks: AudioTrack[], source: AudioSource, autoplay = true): void {
     if (tracks.length === 0) return
+    if (!autoplay) this.#element?.pause()
     this.tracks = tracks
     this.source = source
     this.error = null
     this.index = 0
     this.position = tracks[0]?.startSeconds ?? 0
     this.duration = 0
+    this.playing = false
+    this.loading = false
     this.#finishedIndex = -1
-    this.load(true)
+    this.load(autoplay)
   }
 
   toggle(): void {
@@ -301,7 +304,10 @@ export class AudioPlayer {
     }
     if (autoplay) {
       this.loading = true
+      const loadId = this.#loadId
       element.play().catch(() => {
+        // A newer load can replace this source before the promise settles.
+        if (this.#loadId !== loadId || this.#sourceUrl !== source) return
         this.loading = false
         this.playing = false
         this.error = isLocal
@@ -333,8 +339,11 @@ export class AudioPlayer {
         return
       }
     }
+    const source = this.#sourceUrl
+    const loadId = this.#loadId
     this.loading = true
     element.play().catch(() => {
+      if (this.#loadId !== loadId || this.#sourceUrl !== source) return
       this.loading = false
       this.playing = false
       this.error = "Playback could not start — tap Play to retry"

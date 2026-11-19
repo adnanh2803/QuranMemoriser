@@ -259,6 +259,18 @@ describe("audio player", () => {
     expect(player.playing).toBe(true)
   })
 
+  it("can load a playlist without auto-playing it", () => {
+    const audio = new FakeAudio()
+    const player = new AudioPlayer(() => audio as unknown as HTMLAudioElement)
+    player.play(TRACKS, { kind: "selection", label: "test" }, false)
+    expect(player.active).toBe(true)
+    expect(player.current?.key).toBe("1:1")
+    expect(audio.src).toContain("001001")
+    expect(player.playing).toBe(false)
+    expect(player.loading).toBe(false)
+    expect(audio.playCount).toBe(0)
+  })
+
   it("walks forward on ended and keeps the last track when the playlist ends", () => {
     const { player, audio } = playerWith(TRACKS)
     audio.fire("ended")

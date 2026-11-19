@@ -21,7 +21,6 @@ import OfflineAudioDialog from "../../audio/components/OfflineAudioDialog.svelte
 import type { OfflineAudioRepository } from "../../audio/data/offline-audio-repository"
 import { AudioPlayer } from "../../audio/model/player.svelte"
 import { tracksForJuz, tracksForSurah } from "../../audio/model/playlists"
-import { buildSelectionPlaylist } from "../../audio/model/selection-playback"
 import {
   type BookmarkRepository,
   type WordRangeBookmark,
@@ -107,40 +106,8 @@ $effect(() => {
   }
   lastSelectionRevision = revision
 
-  const reciterId = player.reciterId
-  let cancelled = false
-  void buildSelectionPlaylist(context, selection, reciterId).then(
-    (result) => {
-      if (
-        cancelled ||
-        !player.active ||
-        player.source?.kind !== "selection" ||
-        selection.revision !== revision ||
-        player.reciterId !== reciterId
-      ) {
-        return
-      }
-      if (result === null) return
-      if (!result.ok) {
-        player.error = result.error
-        return
-      }
-      player.play(result.tracks, { kind: "selection", label: result.label })
-    },
-    () => {
-      if (
-        !cancelled &&
-        player.active &&
-        player.source?.kind === "selection" &&
-        player.reciterId === reciterId
-      ) {
-        player.error = "Could not prepare recitation"
-      }
-    },
-  )
-  return () => {
-    cancelled = true
-  }
+  // Changing the selection stops playback instead of auto-playing or repeating.
+  player.stop()
 })
 
 /** All page chunks are loaded up front so page turns never wait on text data. */
