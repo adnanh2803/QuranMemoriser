@@ -33,7 +33,8 @@
 }
 
 .sheet {
-  --m-base: calc(var(--m-fit-body, 19.76) * 0.99);
+  /* A slightly tighter measure gives a bit more type without breaking the fit. */
+  --m-base: calc(var(--m-fit-body, 19.76) * 0.96);
   --mushaf-ink: color-mix(in srgb, var(--ink) 82%, #777);
   --m-line-ratio: 1.92;
   --m-grid: 15;
