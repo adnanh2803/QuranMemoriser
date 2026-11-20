@@ -417,76 +417,84 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
     {/if}
   </header>
 
-  <!-- The glyphs are private-use codepoints: gibberish to reading modes, so
-       the text block is hidden and whole-ayah selection is ours to draw. -->
-  <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
-  <div
-    class="mushaf"
-    class:ready
-    bind:this={box}
-    style="font-family:'{fonts.familyFor(page)}';"
-    aria-hidden="true"
-  >
-    <div class="m-bookmark-layer" bind:this={bookmarkLayer}></div>
-    {#if chunk}
-      {#each chunk.lines as line, lineIndex (line.line)}
-        {#if line.kind === "surah"}
-          <!-- Every surah the page opens gets its name; a mid-page opening is
-               marked only here, since the running head carries no surah. -->
-          <div class="m-line m-surah">
-            <SurahTitle surah={line.surah} revelation={revelations.get(line.surah)} />
-          </div>
-        {:else if line.kind === "opening"}
-          <!-- A surah whose basmalah fills the page's first line: its name
-               sits on the page where it begins, above the basmalah. -->
-          <div class="m-line m-opening">
-            <SurahTitle surah={line.surah} revelation={revelations.get(line.surah)} compact />
-            <span class="m-basmalah-run">{line.glyphs.split("|").join(" ")}</span>
-          </div>
-        {:else if line.kind === "basmalah"}
-          <div class="m-line m-basmalah">
-            <span class="m-basmalah-run">{line.glyphs.split("|").join(" ")}</span>
-          </div>
-        {:else if line.kind === "blank"}
-          <!-- A spacer where the print put the next surah's name band. -->
-          <div class="m-line m-blank"></div>
-        {:else}
-          <!-- A printed line of words; only the words themselves are targets. -->
-          <div class="m-line m-ayah">
-            {#each line.words as word, index (index)}
-              <!-- The sheet is a picture of a page: pointer-driven whole-ayah
-                   selection is deliberate, and the text block is hidden. -->
-              <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
-              <span
-                class="m-word"
-                class:m-end={isEnd(word)}
-                class:m-selected={isSelected(word)}
-                class:m-bookmarked={isBookmarked(word)}
-                class:m-word-bookmarked={isWordBookmarked(word)}
-                class:m-bookmark-start={isBookmarkStart(line.words, index)}
-                class:m-pending={isPending(word)}
-                class:m-selected-start={isSelectedStart(line.words, index)}
-                class:m-selected-end={isSelectedEnd(line.words, index)}
-                class:m-selected-run-start={isSelectedStart(line.words, index)}
-                class:m-selected-page-edge-start={isSelected(word) && isPageFirstWord(word) && isStrokeContinuedBefore(wordRef(word))}
-                class:m-selected-page-edge-end={isSelected(word) && isPageLastWord(word)}
-                data-s={word.s}
-                data-a={word.a}
-                data-g={word.g}
-                onpointerdown={(event) => beginLongPress(word, event)}
-                onpointermove={moveLongPress}
-                onpointerup={endLongPress}
-                onpointercancel={endLongPress}
-                onclick={tapWord(word)}
-              >
-                {#each word.g.split(" ") as part, partIndex (partIndex)}
-                  {#if partIndex > 0}<i class="m-gap"></i>{/if}{part}
-                {/each}
-              </span>
-            {/each}
-          </div>
-        {/if}
-      {/each}
+  <div class="mushaf-area">
+    <!-- The glyphs are private-use codepoints: gibberish to reading modes, so
+         the text block is hidden and whole-ayah selection is ours to draw. -->
+    <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
+    <div
+      class="mushaf"
+      class:ready
+      bind:this={box}
+      style="font-family:'{fonts.familyFor(page)}';"
+      aria-hidden="true"
+    >
+      <div class="m-bookmark-layer" bind:this={bookmarkLayer}></div>
+      {#if chunk}
+        {#each chunk.lines as line, lineIndex (line.line)}
+          {#if line.kind === "surah"}
+            <!-- Every surah the page opens gets its name; a mid-page opening is
+                 marked only here, since the running head carries no surah. -->
+            <div class="m-line m-surah">
+              <SurahTitle surah={line.surah} revelation={revelations.get(line.surah)} />
+            </div>
+          {:else if line.kind === "opening"}
+            <!-- A surah whose basmalah fills the page's first line: its name
+                 sits on the page where it begins, above the basmalah. -->
+            <div class="m-line m-opening">
+              <SurahTitle surah={line.surah} revelation={revelations.get(line.surah)} compact />
+              <span class="m-basmalah-run">{line.glyphs.split("|").join(" ")}</span>
+            </div>
+          {:else if line.kind === "basmalah"}
+            <div class="m-line m-basmalah">
+              <span class="m-basmalah-run">{line.glyphs.split("|").join(" ")}</span>
+            </div>
+          {:else if line.kind === "blank"}
+            <!-- A spacer where the print put the next surah's name band. -->
+            <div class="m-line m-blank"></div>
+          {:else}
+            <!-- A printed line of words; only the words themselves are targets. -->
+            <div class="m-line m-ayah">
+              {#each line.words as word, index (index)}
+                <!-- The sheet is a picture of a page: pointer-driven whole-ayah
+                     selection is deliberate, and the text block is hidden. -->
+                <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
+                <span
+                  class="m-word"
+                  class:m-end={isEnd(word)}
+                  class:m-selected={isSelected(word)}
+                  class:m-bookmarked={isBookmarked(word)}
+                  class:m-word-bookmarked={isWordBookmarked(word)}
+                  class:m-bookmark-start={isBookmarkStart(line.words, index)}
+                  class:m-pending={isPending(word)}
+                  class:m-selected-start={isSelectedStart(line.words, index)}
+                  class:m-selected-end={isSelectedEnd(line.words, index)}
+                  class:m-selected-run-start={isSelectedStart(line.words, index)}
+                  class:m-selected-page-edge-start={isSelected(word) && isPageFirstWord(word) && isStrokeContinuedBefore(wordRef(word))}
+                  class:m-selected-page-edge-end={isSelected(word) && isPageLastWord(word)}
+                  data-s={word.s}
+                  data-a={word.a}
+                  data-g={word.g}
+                  onpointerdown={(event) => beginLongPress(word, event)}
+                  onpointermove={moveLongPress}
+                  onpointerup={endLongPress}
+                  onpointercancel={endLongPress}
+                  onclick={tapWord(word)}
+                >
+                  {#each word.g.split(" ") as part, partIndex (partIndex)}
+                    {#if partIndex > 0}<i class="m-gap"></i>{/if}{part}
+                  {/each}
+                </span>
+              {/each}
+            </div>
+          {/if}
+        {/each}
+      {/if}
+    </div>
+    {#if !ready}
+      <div class="sheet-loading" aria-live="polite">
+        <span class="sheet-loading__spinner" aria-hidden="true"></span>
+        <span class="sheet-loading__label">{chunk ? "Preparing page…" : "Loading page…"}</span>
+      </div>
     {/if}
   </div>
 

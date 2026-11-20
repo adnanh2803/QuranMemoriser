@@ -118,6 +118,17 @@
 
 /* --- the mushaf box ------------------------------------------------------ */
 
+.mushaf-area {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+}
+
 .mushaf {
   direction: rtl;
   display: flex;
@@ -420,6 +431,45 @@
 
 /* A sheet's lines stay hidden until its own font is in and the lines have
    been settled: unshaped glyph codes would measure and paint wrong. */
-.mushaf:not(:empty):not(.ready) {
+.mushaf:not(.ready) {
   visibility: hidden;
+}
+
+.sheet-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  pointer-events: none;
+  color: var(--ink-muted);
+}
+
+.sheet-loading__spinner {
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 2px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 999px;
+  animation: m-sheet-spin 0.9s linear infinite;
+}
+
+.sheet-loading__label {
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  letter-spacing: 0.01em;
+}
+
+@keyframes m-sheet-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-loading__spinner {
+    animation-duration: 1.8s;
+  }
 }
