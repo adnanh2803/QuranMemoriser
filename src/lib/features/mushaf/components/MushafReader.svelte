@@ -24,6 +24,7 @@ import { tracksForJuz, tracksForSurah } from "../../audio/model/playlists"
 import type { BookmarkRepository, WordRangeBookmark } from "../data/bookmark-repository"
 import type { CommandContext, MushafRepository } from "../data/mushaf-repository"
 import type { PageFontRegistry } from "../data/page-fonts"
+import { ReaderBookmarks } from "../model/reader-bookmarks.svelte"
 import { surahOfPage } from "../model/reader-helpers"
 import { clampPage, LAST_PAGE_KEY, PAGE_COUNT, restorePage } from "../model/reader-page"
 import {
@@ -66,9 +67,8 @@ let loadError = $state<string | null>(null)
 let listView = $state(false)
 let menuOpen = $state(false)
 let pageInput = $state("1")
-let bookmarksOpen = $state(false)
-let savedBookmarks = $state<VerseKey[]>([])
-let savedWordBookmarks = $state<WordRangeBookmark[]>([])
+// svelte-ignore state_referenced_locally - repository instance is stable for component lifetime
+const readerBookmarks = new ReaderBookmarks(bookmarks)
 let offlineAudioOpen = $state(false)
 let swipeOrigin: { x: number; y: number } | null = null
 let suppressTapUntil = 0
@@ -115,7 +115,6 @@ const hizb = $derived(meta ? repository.hizbOfPage(current, meta) : null)
 const currentSurah = $derived(surahOfPage(surahs, current))
 const fitBody = $derived(meta?.fit.body ?? 19.76)
 const centreBelow = $derived(meta?.fit.centreBelow ?? 0.55)
-const savedBookmarkCount = $derived(savedBookmarks.length + savedWordBookmarks.length)
 const revelations = $derived(
   new Map(surahs.map((surah) => [surah.surah, surah.revelation] as const)),
 )
@@ -134,12 +133,8 @@ $effect(() => {
     .catch((error: unknown) => {
       if (!cancelled) loadError = error instanceof Error ? error.message : String(error)
     })
-  try {
-    savedBookmarks = bookmarks.list()
-    savedWordBookmarks = bookmarks.listWordRanges()
-  } catch (error) {
-    loadError = error instanceof Error ? error.message : String(error)
-  }
+  const bookmarkError = readerBookmarks.load()
+  if (bookmarkError) loadError = bookmarkError
   return () => {
     cancelled = true
   }
@@ -316,7 +311,7 @@ function jumpToBookmark(key: VerseKey): void {
     .then((all) => {
       const ayah = all.find((item) => `${item.surah}:${item.ayah}` === key)
       if (ayah) {
-        bookmarksOpen = false
+        readerBookmarks.open = false
         showPage(ayah.page)
       }
     })
@@ -326,11 +321,8 @@ function jumpToBookmark(key: VerseKey): void {
 }
 
 function removeBookmark(key: VerseKey): void {
-  try {
-    savedBookmarks = bookmarks.remove(key)
-  } catch (error) {
-    loadError = error instanceof Error ? error.message : String(error)
-  }
+  const error = readerBookmarks.remove(key)
+  if (error) loadError = error
 }
 
 function jumpToWordBookmark(range: WordRangeBookmark): void {
@@ -341,7 +333,7 @@ function jumpToWordBookmark(range: WordRangeBookmark): void {
         (item) => item.surah === range.start.surah && item.ayah === range.start.ayah,
       )
       if (ayah) {
-        bookmarksOpen = false
+        readerBookmarks.open = false
         showPage(ayah.page)
       }
     })
@@ -351,11 +343,8 @@ function jumpToWordBookmark(range: WordRangeBookmark): void {
 }
 
 function removeWordBookmark(range: WordRangeBookmark): void {
-  try {
-    savedWordBookmarks = bookmarks.removeWordRange(range)
-  } catch (error) {
-    loadError = error instanceof Error ? error.message : String(error)
-  }
+  const error = readerBookmarks.removeWordRange(range)
+  if (error) loadError = error
 }
 
 function turn(by: number): void {
@@ -460,10 +449,10 @@ function cycleTheme(): void {
     {searchLoading}
     {searchResults}
     {listView}
-    {bookmarksOpen}
-    {savedBookmarks}
-    {savedWordBookmarks}
-    {savedBookmarkCount}
+    bookmarksOpen={readerBookmarks.open}
+    savedBookmarks={readerBookmarks.saved}
+    savedWordBookmarks={readerBookmarks.wordRanges}
+    savedBookmarkCount={readerBookmarks.count}
     onClose={() => (menuOpen = false)}
     onOpen={() => (menuOpen = true)}
     onGoSurah={goToSurah}
@@ -475,7 +464,7 @@ function cycleTheme(): void {
     onOpenOfflineAudio={openOfflineAudio}
     onOpenSearchResult={openSearchResult}
     onToggleView={toggleView}
-    onToggleBookmarks={() => (bookmarksOpen = !bookmarksOpen)}
+    onToggleBookmarks={() => (readerBookmarks.open = !readerBookmarks.open)}
     onCycleTheme={cycleTheme}
     onJumpBookmark={jumpToBookmark}
     onRemoveBookmark={removeBookmark}
@@ -496,7 +485,7 @@ function cycleTheme(): void {
       <p class="mx-auto mt-6 max-w-xl rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800" role="alert">{loadError}</p>
     {/if}
     {#if listView}
-      <AyahList scrollElement={viewport} {ayahs} {selection} bookmarks={savedBookmarks} onTap={tapAyah} />
+      <AyahList scrollElement={viewport} {ayahs} {selection} bookmarks={readerBookmarks.saved} onTap={tapAyah} />
     {:else}
       <div class="page-stage sheet-anchor">
         {#key current}
@@ -516,8 +505,8 @@ function cycleTheme(): void {
               {fonts}
               {selection}
               {ledger}
-              bookmarkedKeys={savedBookmarks}
-              bookmarkedWordRanges={savedWordBookmarks}
+              bookmarkedKeys={readerBookmarks.saved}
+              bookmarkedWordRanges={readerBookmarks.wordRanges}
               onSelect={select}
             />
           </div>
@@ -534,8 +523,8 @@ function cycleTheme(): void {
       {player}
       {context}
       onPlay={selectionPlayStarted}
-      onBookmarks={(keys) => (savedBookmarks = keys)}
-      onWordBookmarks={(ranges) => (savedWordBookmarks = ranges)}
+      onBookmarks={(keys) => (readerBookmarks.saved = keys)}
+      onWordBookmarks={(ranges) => (readerBookmarks.wordRanges = ranges)}
     />
   {/if}
   <AudioBar {player} {surahs} {selection} />
