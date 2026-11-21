@@ -416,6 +416,9 @@ async function main(): Promise<void> {
     `page layout: ${layout.chunks.length} pages, ${layout.openings.length} surah openings at the top of a page`,
   )
 
+  await mkdir(OUT_DATA, { recursive: true })
+  await mkdir(OUT_PAGES, { recursive: true })
+
   let totalChunkBytes = 0
   const endSlotKeys = new Set<string>()
   const builtChunks = layout.chunks
