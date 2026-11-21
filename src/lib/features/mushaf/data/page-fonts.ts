@@ -37,7 +37,7 @@ export class PageFontRegistry {
   }
 
   urlFor(page: number): string {
-    return `/fonts/pages/QCF_P${String(page).padStart(3, "0")}.woff2`
+    return `${import.meta.env.BASE_URL}fonts/pages/QCF_P${String(page).padStart(3, "0")}.woff2`
   }
 
   /** Register the face (fetches nothing). */
@@ -108,10 +108,11 @@ export class PageFontRegistry {
  * and the continuous Hafs face used in lists.
  */
 export function registerStaticFonts(): void {
-  document.fonts.add(new FontFace("QCF-BSML", "url(/fonts/QCF_BSML.woff2)"))
-  document.fonts.add(new FontFace("SuraNames", "url(/fonts/sura-names.woff2)"))
+  const base = import.meta.env.BASE_URL
+  document.fonts.add(new FontFace("QCF-BSML", `url(${base}fonts/QCF_BSML.woff2)`))
+  document.fonts.add(new FontFace("SuraNames", `url(${base}fonts/sura-names.woff2)`))
   // The continuous Uthmanic Hafs face behind the ayah list and search results.
-  document.fonts.add(new FontFace("UthmanicHafs", "url(/fonts/uthmanic-hafs.woff2)"))
+  document.fonts.add(new FontFace("UthmanicHafs", `url(${base}fonts/uthmanic-hafs.woff2)`))
   void document.fonts.load('1em "QCF-BSML"').catch(() => {})
   void document.fonts.load('1em "SuraNames"').catch(() => {})
   void document.fonts.load('1em "UthmanicHafs"').catch(() => {})

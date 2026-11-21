@@ -28,7 +28,7 @@ export const WORD_PLAYBACK_LABEL = "Word-level playback"
 /** Where a reciter's word-timing map lives, or null when it has none. */
 export function wordTimingsPath(reciterId: string): string | null {
   const file = filesByReciter[reciterId]
-  return file ? `/data/audio-timings/${file}.json` : null
+  return file ? `${import.meta.env.BASE_URL}data/audio-timings/${file}.json` : null
 }
 
 /** EveryAyah recordings in the pinned quran-align archive have word timings. */

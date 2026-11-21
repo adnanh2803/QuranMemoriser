@@ -2,14 +2,15 @@
   "name": "QuranMemoriser",
   "short_name": "QuranMemoriser",
   "description": "Offline Madani Mushaf reader with verse selection",
-  "start_url": "/",
+  "start_url": ".",
+  "scope": ".",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#faf7f0",
   "theme_color": "#0f6b4f",
   "icons": [
     {
-      "src": "/icons/icon.svg",
+      "src": "icons/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"

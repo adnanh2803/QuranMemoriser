@@ -501,7 +501,7 @@ function cycleTheme(): void {
   >
     <div class="flex w-full min-w-0 items-center gap-2.5">
       <img
-        src="/icons/icon.svg"
+        src="{import.meta.env.BASE_URL}icons/icon.svg"
         alt=""
         class="h-8 w-8 rounded-xl border border-hairline bg-bg p-1.5 shadow-sm md:h-9 md:w-9"
       />

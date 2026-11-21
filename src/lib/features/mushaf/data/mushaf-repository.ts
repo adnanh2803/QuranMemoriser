@@ -77,7 +77,9 @@ export class MushafRepository {
   pageChunk(page: number): Promise<PageChunk> {
     const cached = this.chunkPromises.get(page)
     if (cached) return cached
-    const promise = fetch(`/data/pages/p${String(page).padStart(3, "0")}.json`)
+    const promise = fetch(
+      `${import.meta.env.BASE_URL}data/pages/p${String(page).padStart(3, "0")}.json`,
+    )
       .then((response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status} for page ${page}`)
         return response.json()
@@ -93,7 +95,7 @@ export class MushafRepository {
 
   /** The 114-surah index. */
   surahs(): Promise<SurahSummary[]> {
-    this.surahsPromise ??= fetch("/data/surahs.json")
+    this.surahsPromise ??= fetch(`${import.meta.env.BASE_URL}data/surahs.json`)
       .then((response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status} for surahs`)
         return response.json()
@@ -104,7 +106,7 @@ export class MushafRepository {
 
   /** The 6236 ayah metadata rows (Uthmani text, pages, juz, …). */
   ayahs(): Promise<AyahMeta[]> {
-    this.ayahsPromise ??= fetch("/data/ayahs.json")
+    this.ayahsPromise ??= fetch(`${import.meta.env.BASE_URL}data/ayahs.json`)
       .then((response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status} for ayahs`)
         return response.json()
@@ -138,7 +140,7 @@ export class MushafRepository {
 
   /** Reader-wide constants: juz start pages and the QCF v1 type scale. */
   meta(): Promise<MushafMeta> {
-    this.metaPromise ??= fetch("/data/meta.json")
+    this.metaPromise ??= fetch(`${import.meta.env.BASE_URL}data/meta.json`)
       .then((response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status} for meta`)
         return response.json()
@@ -208,7 +210,7 @@ export class MushafRepository {
    * pipeline so selection resolves from one fetch.
    */
   wordLedger(): Promise<WordLedger> {
-    this.ledgerPromise ??= fetch("/data/word-index.json")
+    this.ledgerPromise ??= fetch(`${import.meta.env.BASE_URL}data/word-index.json`)
       .then((response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status} for word index`)
         return response.json()
