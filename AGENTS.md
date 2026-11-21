@@ -46,6 +46,22 @@ src/lib/features/<feature>/
 
 Not every feature needs every folder, but new code should fit this separation.
 
+## Design principles
+
+Apply SOLID pragmatically; prioritize clarity and testability over rigid patterns.
+
+- **Single Responsibility (S):** Each module/component/class should have one reason to change. Split UI rendering, state transitions, data access, and formatting.
+- **Open/Closed (O):** Prefer extension points (props, strategy objects, small interfaces, composition) over editing unrelated behavior into core flows.
+- **Liskov Substitution (L):** Implementations behind an interface/contract must be swappable without surprising callers (e.g., repositories, audio/cache adapters).
+- **Interface Segregation (I):** Keep interfaces small and consumer-focused; don't force components/models to depend on unused methods.
+- **Dependency Inversion (D):** Depend on abstractions/contracts at boundaries (repositories, storage, audio loaders), especially where tests or offline/runtime behavior vary.
+
+Related practices:
+
+- **Separation of concerns:** `components` render, `model` decides, `data` fetches/persists, `domain` defines shared types.
+- **Composition over inheritance:** Favor small composable functions/components/objects.
+- **DRY/KISS/YAGNI:** Reuse proven patterns, keep solutions simple, and avoid speculative abstractions.
+
 ## Modularity and file size
 
 Avoid large files. **No new or refactored file should approach 900 lines.**
