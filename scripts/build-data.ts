@@ -34,6 +34,7 @@
  */
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises"
 import path from "node:path"
+import { pathToFileURL } from "node:url"
 import { inflateRawSync } from "node:zlib"
 
 import {
@@ -574,9 +575,6 @@ async function main(): Promise<void> {
   console.log(`fonts copied: ${fontCount} page fonts + basmalah + sura-names + uthmanic-hafs`)
 }
 
-if (
-  process.argv[1] &&
-  import.meta.url === new URL(`file:///${process.argv[1].replace(/\\/g, "/")}`).href
-) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   await main()
 }
