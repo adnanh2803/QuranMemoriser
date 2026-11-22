@@ -349,7 +349,7 @@ function onDialogClose(): void {
 
 <dialog
   bind:this={dialog}
-  class="offline-audio m-auto max-h-[calc(100dvh-1.5rem)] w-[min(62rem,calc(100vw-1.25rem))] overflow-hidden rounded-3xl border border-hairline bg-surface p-0 text-ink shadow-2xl"
+  class="offline-audio m-0 h-dvh max-h-dvh w-dvw max-w-dvw overflow-hidden border-0 bg-surface p-0 text-ink"
   aria-labelledby="offline-audio-heading"
   aria-describedby="offline-audio-description"
   aria-busy={running}
@@ -357,35 +357,38 @@ function onDialogClose(): void {
   onclose={onDialogClose}
 >
   {#if open}
-    <div class="flex max-h-[calc(100dvh-1.5rem)] flex-col">
-    <header class="flex shrink-0 items-start gap-3 border-b border-hairline px-4 py-4 sm:px-6">
-      <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent" aria-hidden="true">
-        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 4v11"></path>
-          <path d="m7.5 10.5 4.5 4.5 4.5-4.5"></path>
-          <path d="M5 19h14"></path>
-        </svg>
-      </span>
-      <div class="min-w-0 flex-1">
-        <h2 id="offline-audio-heading" class="text-lg font-semibold tracking-tight">Offline recitations</h2>
-        <p id="offline-audio-description" class="mt-1 text-sm leading-relaxed text-ink-muted">
-          Choose one or more surahs, then tick the reciters to keep on this device.
-          Reciters with <strong class="font-medium text-ink">{WORD_PLAYBACK_LABEL}</strong> can also play just the words you select; the others play whole ayahs.
-        </p>
+    <div class="flex h-full flex-col">
+    <header class="shrink-0 border-b border-hairline px-4 py-4 sm:px-6">
+      <div class="mx-auto flex w-full max-w-7xl items-start gap-3">
+        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent" aria-hidden="true">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 4v11"></path>
+            <path d="m7.5 10.5 4.5 4.5 4.5-4.5"></path>
+            <path d="M5 19h14"></path>
+          </svg>
+        </span>
+        <div class="min-w-0 flex-1">
+          <h2 id="offline-audio-heading" class="text-lg font-semibold tracking-tight">Offline recitations</h2>
+          <p id="offline-audio-description" class="mt-1 text-sm leading-relaxed text-ink-muted">
+            Choose one or more surahs, then tick the reciters to keep on this device.
+            Reciters with <strong class="font-medium text-ink">{WORD_PLAYBACK_LABEL}</strong> can also play just the words you select; the others play whole ayahs.
+          </p>
+        </div>
+        <button
+          class="shrink-0 rounded-lg p-2 text-ink-muted transition hover:bg-accent-soft hover:text-ink"
+          onclick={onClose}
+          aria-label="Close offline recitations"
+          title="Close"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M18 6 6 18M6 6l12 12"></path>
+          </svg>
+        </button>
       </div>
-      <button
-        class="shrink-0 rounded-lg p-2 text-ink-muted transition hover:bg-accent-soft hover:text-ink"
-        onclick={onClose}
-        aria-label="Close offline recitations"
-        title="Close"
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-          <path d="M18 6 6 18M6 6l12 12"></path>
-        </svg>
-      </button>
     </header>
 
     <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
+      <div class="mx-auto w-full max-w-7xl">
       {#if job}
         <section class="mb-4 rounded-2xl border border-hairline bg-bg p-3">
           <div class="flex items-center justify-between gap-2 text-xs">
@@ -527,7 +530,7 @@ function onDialogClose(): void {
             {:else if savedGroups.length === 0}
               <p class="mt-2 text-xs leading-relaxed text-ink-muted">No recitations are saved for the selected surahs yet.</p>
             {:else}
-              <div class="mt-2 max-h-[26rem] space-y-3 overflow-y-auto overscroll-contain pr-1">
+              <div class="mt-2 max-h-[min(32rem,calc(100dvh-20rem))] space-y-3 overflow-y-auto overscroll-contain pr-1">
                 {#each savedGroups as group (group.surah.surah)}
                   <section data-saved-surah={group.surah.surah} aria-labelledby={`offline-saved-surah-${group.surah.surah}`}>
                     <div class="flex items-baseline justify-between gap-2">
@@ -575,39 +578,42 @@ function onDialogClose(): void {
           </section>
         </aside>
       </div>
+      </div>
     </div>
 
-    <footer class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-hairline px-4 py-3 sm:px-6">
-      <p class="min-w-0 flex-1 text-[11px] leading-relaxed text-ink-muted">
-        {#if job?.status === "running"}
-          Saving {jobDone} of {jobTotal} ayah files…
-        {:else if chosenSurahs.length === 0}
-          Choose at least one surah.
-        {:else if chosenReciters.length === 0}
-          Choose at least one reciter.
-        {:else}
-          {chosenReciters.length} reciter{chosenReciters.length === 1 ? "" : "s"} × {chosenSurahs.length} surah{chosenSurahs.length === 1 ? "" : "s"} · {totalFiles} ayah files
-        {/if}
-      </p>
-      <div class="flex items-center gap-2">
-        <button
-          class="rounded-lg px-3 py-2 text-sm text-ink-muted transition hover:bg-accent-soft hover:text-ink"
-          onclick={onClose}
-        >{running ? "Close window" : "Close"}</button>
-        {#if running}
+    <footer class="shrink-0 border-t border-hairline px-4 py-3 sm:px-6">
+      <div class="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3">
+        <p class="min-w-0 flex-1 text-[11px] leading-relaxed text-ink-muted">
+          {#if job?.status === "running"}
+            Saving {jobDone} of {jobTotal} ayah files…
+          {:else if chosenSurahs.length === 0}
+            Choose at least one surah.
+          {:else if chosenReciters.length === 0}
+            Choose at least one reciter.
+          {:else}
+            {chosenReciters.length} reciter{chosenReciters.length === 1 ? "" : "s"} × {chosenSurahs.length} surah{chosenSurahs.length === 1 ? "" : "s"} · {totalFiles} ayah files
+          {/if}
+        </p>
+        <div class="flex items-center gap-2">
           <button
-            class="rounded-lg border border-hairline px-3 py-2 text-sm font-medium transition hover:bg-accent-soft"
-            onclick={cancelDownload}
-          >Cancel download</button>
-        {:else}
-          <button
-            class="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-default disabled:opacity-40"
-            onclick={startDownload}
-            disabled={chosenSurahs.length === 0 || chosenReciters.length === 0}
-          >
-            Download selected
-          </button>
-        {/if}
+            class="rounded-lg px-3 py-2 text-sm text-ink-muted transition hover:bg-accent-soft hover:text-ink"
+            onclick={onClose}
+          >{running ? "Close window" : "Close"}</button>
+          {#if running}
+            <button
+              class="rounded-lg border border-hairline px-3 py-2 text-sm font-medium transition hover:bg-accent-soft"
+              onclick={cancelDownload}
+            >Cancel download</button>
+          {:else}
+            <button
+              class="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-default disabled:opacity-40"
+              onclick={startDownload}
+              disabled={chosenSurahs.length === 0 || chosenReciters.length === 0}
+            >
+              Download selected
+            </button>
+          {/if}
+        </div>
       </div>
     </footer>
     </div>
