@@ -58,7 +58,7 @@ let {
 <button
   class="col-span-full flex w-full items-center gap-3 rounded-2xl border border-hairline bg-bg px-3 py-3 text-left shadow-sm transition hover:border-accent/30 hover:bg-accent-soft md:col-span-2"
   onclick={onOpenOfflineAudio}
-  aria-label="Open offline recitations"
+  aria-label="Open download recitations"
 >
   <span
     class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent"
@@ -80,7 +80,7 @@ let {
     </svg>
   </span>
   <span class="min-w-0 flex-1">
-    <span class="block text-sm font-medium">Offline recitations</span>
+    <span class="block text-sm font-medium">Download recitations</span>
     <span class="block text-xs text-ink-muted"
       >Choose a surah and the reciters to save on this device</span
     >
@@ -280,26 +280,5 @@ let {
       {/if}
     </div>
   {/if}
-  <button
-    class="rounded-lg p-2 text-ink-muted transition hover:bg-accent-soft hover:text-accent active:scale-95"
-    onclick={onCycleTheme}
-    aria-label="Change theme"
-    title="Change theme"
-  >
-    <!-- sun/moon theme glyph -->
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="1.8"
-      stroke-linecap="round"
-    >
-      <circle cx="12" cy="12" r="4.2"></circle>
-      <path
-        d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.4 1.4M17.6 17.6L19 19M19 5l-1.4 1.4M6.4 17.6L5 19"
-      ></path>
-    </svg>
-  </button>
+
 </div>

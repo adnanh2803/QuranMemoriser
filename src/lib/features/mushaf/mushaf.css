@@ -7,7 +7,7 @@
  *
  * Sizing follows the layout's own scale (public/data/meta.json): the sheet is
  * set so the widest printed line (fit.body = 19.76 ems in v1) just fills it,
- * at one type size for the whole mushaf. The line grid is 15 × 1.92 em.
+ * at one type size for the whole mushaf. The line grid is 15 × 1.6 em.
  */
 
 .sheet-anchor {
@@ -34,34 +34,36 @@
 
 .sheet {
   /* A slightly tighter measure gives a bit more type without breaking the fit. */
-  --m-base: calc(var(--m-fit-body, 19.76) * 0.96);
+  /* Lower multiplier = bigger glyphs, tighter word spacing. */
+  --m-base: calc(var(--m-fit-body, 19.76) * 0.82);
   --mushaf-ink: color-mix(in srgb, var(--ink) 82%, #777);
-  --m-line-ratio: 1.92;
+  --m-line-ratio: 1.6;
   --m-grid: 15;
   --m-line-h: calc(var(--m-line-ratio) * 1em);
   /* The selection wash's horizontal cushion: how far the highlighter bar
      leans past the run's first and last words. */
   --m-wash-pad-x: 0.28em;
-  --sheet-pad-x: clamp(4px, calc(4px + (100vw - 640px) * 0.02), 16px);
+  --sheet-pad-x: clamp(2px, calc(2px + (100vw - 640px) * 0.015), 10px);
   --sheet-pad-t: 8px;
   --sheet-pad-b: 8px;
   /* Everything above the type that the height bound must leave room for:
      top bar, sheet margin and the running head with its gap. */
   --chrome-f: var(--reader-chrome, 76px);
 
-  /* The type size: the smallest of the zoom asked for, the width the sheet
-     actually got, and one whole page in the height (floored so a page that
-     scrolls beats one that cannot be read). */
+  /* Type size: width-driven so the mushaf stays stretched. User scale is
+     clamped to avoid breaking page-fit/overlay alignment. */
   --m-size: min(
-    calc(var(--page-measure, 640px) / var(--m-base)),
-    calc((100cqw - var(--sheet-pad-x) * 2) / var(--m-base)),
-    max(calc((100svh - var(--chrome-f)) / (var(--m-grid) * var(--m-line-ratio))), 10px)
+    calc(min(
+      calc(var(--page-measure, 640px) / var(--m-base)),
+      calc((100cqw - var(--sheet-pad-x) * 2) / var(--m-base))
+    ) * clamp(0.85, var(--mushaf-user-scale, 1.7), 1.7)),
+    calc((100cqw - var(--sheet-pad-x) * 2) / var(--m-base))
   );
 
   position: relative;
   display: flex;
   width: 100%;
-  height: 100%;
+  min-height: 100%;
   flex-direction: column;
   padding: var(--sheet-pad-t) var(--sheet-pad-x) var(--sheet-pad-b);
   background: var(--page);
@@ -167,7 +169,7 @@
    and last words of a flush line clear of the page edge. The settle pass reads
    this same padding so the measure it justifies against stays true. */
 .m-line.m-ayah {
-  padding-inline: 0.42em;
+  padding-inline: 0.15em;
 }
 
 /* A line that stops short of the margin is centred rather than pulled apart —
@@ -352,8 +354,11 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0;
+  gap: 0.08em;
+  height: auto;
+  min-height: var(--m-line-h);
   line-height: 1;
+  padding-block: 0.04em;
 }
 
 .surah-title--compact {
@@ -368,9 +373,9 @@
 }
 
 .m-line.m-opening .ph-surah {
-  font-size: 0.98em;
+  font-size: clamp(1.5rem, calc(100cqw * 0.0225), 2rem);
   line-height: 1;
-  transform: scaleX(1.04);
+  transform: scaleX(1.12);
 }
 
 .m-line.m-basmalah {
@@ -392,7 +397,7 @@
   max-width: 100%;
   padding-inline: 0.25em;
   font-family: "QCF-BSML", serif;
-  font-size: 0.66em;
+  font-size: 0.9em;
   color: color-mix(in srgb, var(--mushaf-ink) 88%, var(--accent));
   line-height: 1;
   white-space: pre;
@@ -403,10 +408,16 @@
   transform: translateX(0.75em);
 }
 
-/* A shared opening line keeps the basmalah smaller than the standalone band. */
+/* Keep basmalah the same size on all pages, including shared opening lines. */
 .m-line.m-opening .m-basmalah-run {
-  font-size: 0.56em;
+  font-size: 0.9em;
   line-height: 1;
+}
+
+/* Give the first ayah a little breathing room below the bismillah. */
+.m-line.m-basmalah + .m-line.m-ayah,
+.m-line.m-opening + .m-line.m-ayah {
+  margin-top: 0.3em;
 }
 
 /* --- folio ---------------------------------------------------------------- */

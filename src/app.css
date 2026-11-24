@@ -91,12 +91,13 @@ html {
   height: 100%;
   overflow: hidden;
   overscroll-behavior: none;
+  background-color: var(--page);
 }
 
 body {
   height: 100%;
   overflow: hidden;
-  background-color: var(--bg);
+  background-color: var(--page);
   color: var(--ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;

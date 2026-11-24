@@ -2,7 +2,7 @@
 import { faKaaba } from "@fortawesome/free-solid-svg-icons/faKaaba"
 import { faMosque } from "@fortawesome/free-solid-svg-icons/faMosque"
 import { FontAwesomeIcon } from "@fortawesome/svelte-fontawesome"
-import { surahNameGlyph } from "../model/surah-names"
+import { SURAH_WORD, surahNameGlyph } from "../model/surah-names"
 
 interface Props {
   surah: number
@@ -35,5 +35,5 @@ let { surah, revelation, compact = false }: Props = $props()
   data-revelation={revelation ?? "unknown"}
 >
   {@render symbol()}
-  <span class="ph-surah">{surahNameGlyph(surah)}</span>
+  <span class="ph-surah">{surahNameGlyph(surah)} {SURAH_WORD}</span>
 </span>

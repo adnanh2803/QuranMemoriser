@@ -52,104 +52,110 @@ function selectCurrent(): void {
 }
 </script>
 
-<section aria-labelledby="surah-picker-heading">
-  <div class="mb-2 flex flex-wrap items-end justify-between gap-2">
-    <div class="min-w-0">
-      <h3 id="surah-picker-heading" class="text-sm font-semibold">Surahs</h3>
-      <p class="text-[11px] text-ink-muted">
-        {selected.size} selected · {selectedAyahs} ayahs
-      </p>
-    </div>
-    <div class="flex items-center gap-1 text-xs">
+<section aria-labelledby="surah-picker-heading" class="space-y-3">
+  <div class="flex items-center gap-2">
+    <h3 id="surah-picker-heading" class="text-base font-semibold">Surahs</h3>
+    {#if selected.size > 0}
+      <span class="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium tabular-nums text-accent">{selected.size}</span>
+    {/if}
+  </div>
+
+  <div class="flex items-center gap-2">
+    <label class="relative block min-w-0 flex-1">
+      <span class="sr-only">Find a surah</span>
+      <svg
+        class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        aria-hidden="true"
+      >
+        <circle cx="11" cy="11" r="7"></circle>
+        <path d="m20 20-3.5-3.5"></path>
+      </svg>
+      <input
+        type="search"
+        class="block w-full rounded-xl border border-hairline bg-surface py-2.5 pl-9 pr-3 text-sm outline-none focus:border-accent"
+        placeholder="Find a surah"
+        bind:value={query}
+      />
+    </label>
+    <div class="flex shrink-0 items-center gap-1">
       {#if currentSurah !== null}
         <button
-          class="rounded-lg px-2 py-1.5 text-ink-muted transition hover:bg-accent-soft hover:text-ink disabled:opacity-40"
+          type="button"
+          class="rounded-lg p-2 text-ink-muted transition hover:bg-accent-soft hover:text-ink disabled:opacity-40"
           onclick={selectCurrent}
           disabled={disabled}
-          title="Select the surah shown on the current page"
-        >Current</button>
+          aria-label="Select current surah"
+          title="Select current surah"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle><path d="M12 2v2M22 12h-2M12 22v-2M2 12h2"></path></svg>
+        </button>
       {/if}
       <button
-        class="rounded-lg px-2 py-1.5 text-ink-muted transition hover:bg-accent-soft hover:text-ink disabled:opacity-40"
+        type="button"
+        class="rounded-lg p-2 text-ink-muted transition hover:bg-accent-soft hover:text-ink disabled:opacity-40"
         onclick={selectAll}
         disabled={disabled}
-        title="Select all 114 surahs"
-      >Select all</button>
+        aria-label="Select all surahs"
+        title="Select all surahs"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"></path><path d="m9 6 2 2 4-4"></path></svg>
+      </button>
       <button
-        class="rounded-lg px-2 py-1.5 text-ink-muted transition hover:bg-accent-soft hover:text-ink disabled:opacity-40"
+        type="button"
+        class="rounded-lg p-2 text-ink-muted transition hover:bg-accent-soft hover:text-ink disabled:opacity-40"
         onclick={clearSelection}
         disabled={disabled}
-      >Clear</button>
+        aria-label="Clear surah selection"
+        title="Clear selection"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+      </button>
     </div>
   </div>
 
-  <div class="overflow-hidden rounded-2xl border border-hairline bg-bg">
-    <div class="border-b border-hairline p-2">
-      <label class="relative block">
-        <span class="sr-only">Find a surah</span>
-        <svg
-          class="pointer-events-none absolute left-2.5 top-2.5 text-ink-muted"
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          aria-hidden="true"
-        >
-          <circle cx="11" cy="11" r="7"></circle>
-          <path d="m20 20-3.5-3.5"></path>
-        </svg>
+  <div
+    class="grid max-h-[min(26rem,45dvh)] grid-cols-2 gap-x-1 gap-y-0.5 overflow-y-auto overscroll-contain sm:max-h-[min(30rem,50dvh)]"
+    role="group"
+    aria-labelledby="surah-picker-heading"
+  >
+    {#each filteredSurahs as surah (surah.surah)}
+      <label
+        class="flex min-w-0 cursor-pointer items-center gap-1.5 rounded-xl border border-transparent px-2 py-2 text-xs transition hover:bg-accent-soft has-checked:border-accent/30 has-checked:bg-accent-soft/60 sm:gap-2.5 sm:px-3 sm:text-sm"
+        data-surah={surah.surah}
+      >
         <input
-          type="search"
-          class="block w-full rounded-xl border border-hairline bg-surface py-2 pl-8 pr-3 text-sm outline-none focus:border-accent"
-          placeholder="Find a surah"
-          bind:value={query}
+          class="h-4 w-4 shrink-0 accent-accent"
+          type="checkbox"
+          checked={selected.has(surah.surah)}
+          disabled={disabled}
+          onchange={(event) => toggle(surah, event.currentTarget.checked)}
         />
+        <span class="w-5 shrink-0 tabular-nums text-ink-muted sm:w-7">{surah.surah}</span>
+        <span class="truncate">{surah.name}</span>
+        {#if savedSurahs.has(surah.surah)}
+          <span
+            class="ml-auto h-2 w-2 shrink-0 rounded-full bg-accent"
+            title="Some recitations saved"
+          ></span>
+        {/if}
       </label>
-    </div>
-
-    <div
-      class="grid max-h-56 gap-0.5 overflow-y-auto overscroll-contain p-1.5 sm:grid-cols-2 sm:max-h-64"
-      role="group"
-      aria-labelledby="surah-picker-heading"
-    >
-      {#each filteredSurahs as surah (surah.surah)}
-        <label
-          class="flex min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-transparent px-2 py-1.5 text-xs transition hover:bg-accent-soft has-checked:border-accent/30 has-checked:bg-accent-soft/60"
-          data-surah={surah.surah}
-        >
-          <input
-            class="h-4 w-4 shrink-0 accent-accent"
-            type="checkbox"
-            checked={selected.has(surah.surah)}
-            disabled={disabled}
-            onchange={(event) => toggle(surah, event.currentTarget.checked)}
-          />
-          <span class="w-6 shrink-0 tabular-nums text-ink-muted">{surah.surah}</span>
-          <span class="truncate">{surah.name}</span>
-          {#if savedSurahs.has(surah.surah)}
-            <span
-              class="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-accent"
-              title="Some recitations saved"
-            ></span>
-          {/if}
-        </label>
-      {:else}
-        <p class="col-span-full px-3 py-6 text-center text-xs text-ink-muted">
-          {query.trim() === "" ? "Surahs are still loading…" : `No surahs match “${query}”.`}
-        </p>
-      {/each}
-    </div>
-
-    <p class="line-clamp-2 border-t border-hairline px-3 py-2 text-[11px] text-ink-muted">
-      {#if selectedSurahs.length === 0}
-        Choose at least one surah.
-      {:else}
-        <span class="font-medium text-ink">Selected:</span>
-        {selectedNames}
-      {/if}
-    </p>
+    {:else}
+      <p class="col-span-full px-3 py-8 text-center text-sm text-ink-muted">
+        {query.trim() === "" ? "Surahs are still loading…" : `No surahs match “${query}”.`}
+      </p>
+    {/each}
   </div>
+
+  {#if selectedSurahs.length > 0}
+    <p class="line-clamp-2 text-xs text-ink-muted">
+      <span class="font-medium text-ink">Selected:</span> {selectedNames}
+    </p>
+  {/if}
 </section>

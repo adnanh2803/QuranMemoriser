@@ -1,18 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="QuranMemoriser">
-  <rect width="512" height="512" rx="96" fill="#0f6b4f"/>
-  <!-- Open mushaf: two parchment leaves -->
-  <path d="M96 128c48-16 96-16 152 8 56-24 104-24 152-8v248c-48-16-96-16-152 8-56-24-104-24-152-8z" fill="#fffdf7"/>
-  <path d="M256 136v248" stroke="#0f6b4f" stroke-width="6" stroke-linecap="round" opacity="0.25"/>
-  <!-- Text lines -->
-  <g stroke="#1e1b16" stroke-width="10" stroke-linecap="round" opacity="0.85">
-    <path d="M124 176h100"/>
-    <path d="M288 176h100"/>
-    <path d="M124 224h100"/>
-    <path d="M288 224h100"/>
-    <path d="M124 272h72"/>
-    <path d="M316 272h72"/>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a8f66"/>
+      <stop offset="100%" stop-color="#0a5c42"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#g)"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M256 150v232" stroke="rgba(255,253,248,0.35)" stroke-width="8"/>
+    <path d="M118 156c42-18 92-14 138 12v224c-46-26-96-30-138-12z" fill="#FFFDF8" fill-opacity="0.96" stroke="rgba(255,253,248,0.25)" stroke-width="4"/>
+    <path d="M394 156c-42-18-92-14-138 12v224c46-26 96-30 138-12z" fill="#FFFDF8" fill-opacity="0.96" stroke="rgba(255,253,248,0.25)" stroke-width="4"/>
+    <path d="M150 204h74M150 244h74M150 284h52" stroke="#1F5B45" stroke-width="10" opacity="0.55"/>
+    <path d="M288 204h74M288 244h74M310 284h52" stroke="#1F5B45" stroke-width="10" opacity="0.55"/>
+    <circle cx="256" cy="344" r="24" fill="#E0C35A"/>
+    <circle cx="256" cy="344" r="11" fill="#0A5C42" opacity="0.9"/>
   </g>
-  <!-- Ayah marker -->
-  <circle cx="256" cy="360" r="26" fill="#c9a227"/>
-  <path d="M238 360a18 18 0 0 1 18-18v36a18 18 0 0 1-18-18zm36 0a18 18 0 0 0-18-18v36a18 18 0 0 0 18-18z" fill="#0f6b4f"/>
 </svg>

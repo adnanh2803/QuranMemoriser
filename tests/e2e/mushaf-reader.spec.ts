@@ -63,7 +63,7 @@ test("marks every surah opening printed on a page", async ({ page }) => {
   await page.waitForSelector('.sheet[data-page="1"] .mushaf.ready', { timeout: 20000 })
 
   // Page 1 opens Al-Fatiha with its calligraphic name in the line grid. The
-  // running head carries only the juz and hizb, both at the page's left edge.
+  // running head no longer shows juz/hizb labels.
   const pageOne = page.locator('.sheet[data-page="1"]')
   const pageOneTitle = pageOne.locator(".m-line.m-surah .surah-title")
   await expect(pageOne.locator(".m-line.m-surah")).toHaveCount(1)
@@ -72,8 +72,8 @@ test("marks every surah opening printed on a page", async ({ page }) => {
   await expect(pageOneTitle.locator('.surah-title__symbol svg[data-icon="kaaba"]')).toHaveCount(1)
   await expect(pageOneTitle.locator(".surah-title__frame")).toHaveCount(0)
   await expect(pageOne.locator(".sheet-head .ph-surah")).toHaveCount(0)
-  await expect(pageOne.locator(".sheet-head .ph-juz")).not.toBeEmpty()
-  await expect(pageOne.locator(".sheet-head .ph-hizb")).not.toBeEmpty()
+  await expect(pageOne.locator(".sheet-head .ph-juz")).toHaveCount(0)
+  await expect(pageOne.locator(".sheet-head .ph-hizb")).toHaveCount(0)
 
   // The simple title sits inside the printed title line without growing it.
   const titleLine = await pageOne.locator(".m-line.m-surah").boundingBox()
@@ -83,14 +83,6 @@ test("marks every surah opening printed on a page", async ({ page }) => {
   expect(title.x + title.width).toBeLessThanOrEqual(titleLine.x + titleLine.width + 1)
   expect(title.y).toBeGreaterThanOrEqual(titleLine.y - 1)
   expect(title.y + title.height).toBeLessThanOrEqual(titleLine.y + titleLine.height + 1)
-
-  const head = await pageOne.locator(".sheet-head").boundingBox()
-  if (!head) throw new Error("Page 1 header was not laid out")
-  for (const label of [".ph-juz", ".ph-hizb"]) {
-    const box = await pageOne.locator(`.sheet-head ${label}`).boundingBox()
-    if (!box) throw new Error(`Page 1 ${label} was not laid out`)
-    expect(box.x + box.width).toBeLessThanOrEqual(head.x + head.width / 2)
-  }
 
   await page.getByRole("button", { name: "Show controls" }).click()
   const pageInput = page.getByLabel("Go to page")

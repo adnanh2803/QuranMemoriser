@@ -38,6 +38,7 @@ import type { WordLedger } from "../model/word-ledger"
 import AyahList from "./AyahList.svelte"
 import MushafSheet from "./MushafSheet.svelte"
 import ReaderMenu from "./ReaderMenu.svelte"
+import ReaderNavDialog from "./ReaderNavDialog.svelte"
 import SelectionBanner from "./SelectionBanner.svelte"
 
 interface Props {
@@ -66,10 +67,11 @@ let searchError = $state<string | null>(null)
 let loadError = $state<string | null>(null)
 let listView = $state(false)
 let menuOpen = $state(false)
-let pageInput = $state("1")
+
 // svelte-ignore state_referenced_locally - repository instance is stable for component lifetime
 const readerBookmarks = new ReaderBookmarks(bookmarks)
 let offlineAudioOpen = $state(false)
+let navOpen = $state(false)
 let swipeOrigin: { x: number; y: number } | null = null
 let suppressTapUntil = 0
 /** The recitation player: created once, lives across playlists. */
@@ -212,27 +214,13 @@ $effect(() => {
   }
 })
 
-$effect(() => {
-  pageInput = String(current)
-})
-
 function showPage(page: number): void {
   const target = clampPage(page)
   if (target !== current) turnDirection = target > current ? -1 : 1
   current = target
-  pageInput = String(target)
   listView = false
   menuOpen = false
   localStorage.setItem(LAST_PAGE_KEY, String(target))
-}
-
-function goToPage(): void {
-  const page = Number.parseInt(pageInput, 10)
-  if (Number.isInteger(page) && page >= 1 && page <= PAGE_COUNT) {
-    showPage(page)
-  } else {
-    pageInput = String(current)
-  }
 }
 
 function goToSurah(surah: number): void {
@@ -406,7 +394,6 @@ function tapAyah(key: VerseKey, extend: boolean): void {
     const ayah = ayahs.find((item) => `${item.surah}:${item.ayah}` === key)
     if (ayah) {
       current = ayah.page
-      pageInput = String(ayah.page)
       localStorage.setItem(LAST_PAGE_KEY, String(ayah.page))
     }
   }
@@ -418,14 +405,45 @@ function openOfflineAudio(): void {
   offlineAudioOpen = true
 }
 
+function openNav(): void {
+  menuOpen = false
+  navOpen = true
+}
+
 function cycleTheme(): void {
-  const themes = ["parchment", "sepia", "night"]
+  const themes = ["parchment", "sepia", "night"] as const
+  const colors: Record<string, string> = {
+    parchment: "#fffdf7",
+    sepia: "#fdf8ec",
+    night: "#211e1b",
+  }
   const now = document.documentElement.dataset.theme ?? "parchment"
-  const at = themes.indexOf(now)
+  const at = themes.indexOf(now as (typeof themes)[number])
   const next = themes[(at + 1) % themes.length]
   if (next === undefined) return
   document.documentElement.dataset.theme = next
   localStorage.setItem("qm.theme", next)
+  const color = colors[next] ?? "#fffdf7"
+  document.documentElement.style.backgroundColor = color
+  document.documentElement.style.colorScheme = next === "night" ? "dark" : "light"
+  document.body.style.backgroundColor = color
+  const menu = document.getElementById("reader-menu")
+  if (menu) {
+    const bg = menu.querySelector(":scope > div") as HTMLElement | null
+    if (bg) bg.style.backgroundColor = color
+  }
+  document.querySelectorAll<HTMLElement>(".offline-audio,[role='dialog']").forEach((el) => {
+    if (getComputedStyle(el).position !== "fixed") return
+    const bg = el.querySelector(":scope > div[aria-hidden='true']") as HTMLElement | null
+    if (bg) bg.style.backgroundColor = color
+    else el.style.backgroundColor = color
+  })
+  let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+  if (meta) meta.remove()
+  meta = document.createElement("meta")
+  meta.setAttribute("name", "theme-color")
+  meta.setAttribute("content", color)
+  document.head.appendChild(meta)
 }
 </script>
 
@@ -436,50 +454,54 @@ function cycleTheme(): void {
 />
 
 <div
-  class="relative flex h-[100svh] flex-col overflow-hidden bg-bg text-ink"
+  class="relative flex h-[100svh] flex-col overflow-hidden bg-page text-ink"
 >
   <ReaderMenu
     open={menuOpen}
-    {surahs}
-    {juz}
-    {current}
-    {pageInput}
-    {searchQuery}
-    {searchError}
-    {searchLoading}
-    {searchResults}
-    {listView}
-    bookmarksOpen={readerBookmarks.open}
-    savedBookmarks={readerBookmarks.saved}
-    savedWordBookmarks={readerBookmarks.wordRanges}
-    savedBookmarkCount={readerBookmarks.count}
     onClose={() => (menuOpen = false)}
     onOpen={() => (menuOpen = true)}
-    onGoSurah={goToSurah}
-    onGoJuz={goToJuz}
-    onPlaySurah={playCurrentSurah}
-    onPlayJuz={playCurrentJuz}
-    onGoPage={goToPage}
-    onTurn={turn}
     onOpenOfflineAudio={openOfflineAudio}
-    onOpenSearchResult={openSearchResult}
-    onToggleView={toggleView}
-    onToggleBookmarks={() => (readerBookmarks.open = !readerBookmarks.open)}
-    onCycleTheme={cycleTheme}
-    onJumpBookmark={jumpToBookmark}
-    onRemoveBookmark={removeBookmark}
-    onJumpWordBookmark={jumpToWordBookmark}
-    onRemoveWordBookmark={removeWordBookmark}
-    onPageInputChange={(value) => (pageInput = value)}
-    onSearchQueryChange={(value) => (searchQuery = value)}
   />
+
+  {#if !menuOpen && !navOpen && !offlineAudioOpen}
+    <button
+      class="absolute top-[max(0.5rem,env(safe-area-inset-top))] left-[max(0.75rem,env(safe-area-inset-left))] z-20 flex h-10 w-10 items-center justify-center rounded-full text-ink-muted transition hover:bg-accent-soft hover:text-accent"
+      onclick={cycleTheme}
+      aria-label="Change theme"
+      title="Change theme"
+    >
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        stroke-linecap="round"
+      >
+        <circle cx="12" cy="12" r="4.2"></circle>
+        <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.4 1.4M17.6 17.6L19 19M19 5l-1.4 1.4M6.4 17.6L5 19"></path>
+      </svg>
+    </button>
+  {/if}
+
+  {#if !menuOpen && !navOpen && !offlineAudioOpen && currentSurah}
+    <button
+      class="absolute top-[max(0.5rem,env(safe-area-inset-top))] left-1/2 z-20 grid w-[min(28rem,calc(100%-7rem))] -translate-x-1/2 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 overflow-hidden rounded-full border border-hairline bg-surface/95 px-4 py-1.5 text-sm font-medium text-ink shadow-md backdrop-blur-md hover:transition-colors hover:duration-150 hover:bg-accent-soft hover:text-accent"
+      onclick={openNav}
+      aria-label="Current surah: {currentSurah.name}{juz ? `, Juz ${juz}` : ""}{hizb ? `, Hizb ${hizb}` : ""}. Open navigation"
+      title="Go to surah, page, juz, or hizb"
+    >
+      <span class="shrink-0 text-left text-xs text-ink-muted tabular-nums">{juz ? `Juz ${juz}` : ""}</span>
+      <span class="min-w-0 truncate text-center text-sm font-semibold"><span class="tabular-nums text-ink-muted">{currentSurah.surah}.</span> {currentSurah.name}</span>
+      <span class="shrink-0 text-right text-xs text-ink-muted tabular-nums">{hizb ? `Hizb ${hizb}` : ""}</span>
+    </button>
+  {/if}
 
   <main
     bind:this={viewport}
     onpointerdown={onPagePointerDown}
-    class="relative min-h-0 flex-1 overflow-x-hidden overscroll-none"
-    class:overflow-y-auto={listView}
-    class:overflow-hidden={!listView}
+    class="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-none bg-page pt-14"
   >
     {#if loadError}
       <p class="mx-auto mt-6 max-w-xl rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800" role="alert">{loadError}</p>
@@ -497,8 +519,6 @@ function cycleTheme(): void {
             <MushafSheet
               page={current}
               chunk={chunks.get(current) ?? null}
-              {juz}
-              {hizb}
               {revelations}
               {fitBody}
               {centreBelow}
@@ -528,6 +548,17 @@ function cycleTheme(): void {
     />
   {/if}
   <AudioBar {player} {surahs} {selection} />
+  <ReaderNavDialog
+    open={navOpen}
+    {surahs}
+    {ayahs}
+    {meta}
+    {current}
+    onClose={() => (navOpen = false)}
+    onGoSurah={goToSurah}
+    onGoJuz={goToJuz}
+    onGoPage={showPage}
+  />
   <OfflineAudioDialog
     open={offlineAudioOpen}
     {surahs}

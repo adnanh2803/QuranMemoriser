@@ -1,6 +1,6 @@
 <script lang="ts" module>
-/** Arabic-Indic numerals for the running head and folio, as the print. */
-const arabicNumber = new Intl.NumberFormat("ar-EG")
+  /** Arabic-Indic numerals for the folio, as the print. */
+  const arabicNumber = new Intl.NumberFormat("ar-EG")
 </script>
 
 <!--
@@ -32,8 +32,6 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
   interface Props {
     page: number
     chunk: PageChunk | null
-    juz: number | null
-    hizb: number | null
     /** Place of revelation for each surah, for the title's side symbols. */
     revelations: ReadonlyMap<number, "makkah" | "madinah">
     fitBody: number
@@ -47,7 +45,7 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
     onSelect: (candidate: RunCandidate, extend: boolean) => void
   }
 
-  let { page, chunk, juz, hizb, revelations, fitBody, centreBelow, fonts, selection, ledger, bookmarkedKeys, bookmarkedWordRanges, onSelect }: Props = $props()
+  let { page, chunk, revelations, fitBody, centreBelow, fonts, selection, ledger, bookmarkedKeys, bookmarkedWordRanges, onSelect }: Props = $props()
   const bookmarkedSet = $derived(new Set(bookmarkedKeys))
 
   let box = $state<HTMLDivElement | null>(null)
@@ -301,14 +299,7 @@ const arabicNumber = new Intl.NumberFormat("ar-EG")
   data-page={page}
   style="--m-fit-body:{fitBody};"
 >
-  <header class="sheet-head">
-    {#if juz !== null}
-      <span class="ph-label ph-juz">جزء {arabicNumber.format(juz)}</span>
-    {/if}
-    {#if hizb !== null}
-      <span class="ph-label ph-hizb">حزب {arabicNumber.format(hizb)}</span>
-    {/if}
-  </header>
+  <header class="sheet-head"></header>
 
   <div class="mushaf-area">
     <!-- The glyphs are private-use codepoints: gibberish to reading modes, so
